@@ -68,6 +68,53 @@ export type Database = {
           },
         ]
       }
+      bot_actions: {
+        Row: {
+          created_at: string
+          done_at: string | null
+          due_at: string | null
+          id: string
+          message: string | null
+          payload: Json | null
+          status: string
+          tenant_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          done_at?: string | null
+          due_at?: string | null
+          id?: string
+          message?: string | null
+          payload?: Json | null
+          status?: string
+          tenant_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          done_at?: string | null
+          due_at?: string | null
+          id?: string
+          message?: string | null
+          payload?: Json | null
+          status?: string
+          tenant_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_actions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           auto_renew: boolean | null
