@@ -14,13 +14,13 @@ export function BotBell() {
   return (
     <Link
       to="/assistente"
-      className="relative inline-flex items-center gap-2 px-3 py-2 rounded-md bg-sidebar-accent/30 hover:bg-sidebar-accent text-sm font-medium"
+      className="relative inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-background hover:bg-accent text-sm font-medium"
       title="Assistente"
     >
       <Bot className="size-4" />
       <span>Assistente</span>
       {count > 0 && (
-        <span className="absolute -top-1 -right-1 size-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center ring-2 ring-sidebar">
+        <span className="absolute -top-1 -right-1 size-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center ring-2 ring-background">
           {count > 99 ? "99+" : count}
         </span>
       )}
