@@ -108,7 +108,7 @@ export function MonthlyPaymentGrid({
               <DropdownMenu key={monthNum}>
                 <DropdownMenuTrigger asChild>
                   <button
-                    disabled={beforeStart ?? undefined}
+                    disabled={!!beforeStart}
                     className={`rounded-lg border p-3 text-left transition hover:scale-[1.02] disabled:opacity-40 disabled:cursor-not-allowed ${styles}`}
                   >
                     <div className="flex items-center justify-between">
