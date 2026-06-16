@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { listContracts } from "@/lib/api/crm.functions";
 import { PageHeader } from "@/components/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { brl, formatDateBR } from "@/lib/finance";
@@ -26,6 +29,27 @@ export const Route = createFileRoute("/contratos")({
 function Page() {
   const { data } = useSuspenseQuery(opts);
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const groups = useMemo(() => {
+    const filtered = data.filter((c: any) => {
+      if (!q) return true;
+      const s = q.toLowerCase();
+      return (c.tenants?.name ?? "").toLowerCase().includes(s) ||
+             (c.properties?.name ?? "").toLowerCase().includes(s);
+    });
+    const sorted = [...filtered].sort((a: any, b: any) =>
+      (a.tenants?.name ?? "").localeCompare(b.tenants?.name ?? "", "pt-BR")
+    );
+    const g = new Map<string, any[]>();
+    sorted.forEach((c: any) => {
+      const first = (c.tenants?.name ?? "?").trim().charAt(0).toUpperCase();
+      const key = /[A-Z]/.test(first) ? first : "#";
+      if (!g.has(key)) g.set(key, []);
+      g.get(key)!.push(c);
+    });
+    return Array.from(g.entries());
+  }, [data, q]);
 
   async function downloadBlank() {
     try {
@@ -67,39 +91,52 @@ function Page() {
           </div>
         }
       />
-      <div className="p-8">
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Inquilino</TableHead>
-                <TableHead>Imóvel</TableHead>
-                <TableHead>Início</TableHead>
-                <TableHead>Fim</TableHead>
-                <TableHead className="text-right">Aluguel</TableHead>
-                <TableHead className="text-center">Vencimento</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((c: any) => (
-                <TableRow key={c.id}>
-                  <TableCell>
-                    <Link to="/inquilinos/$id" params={{ id: c.tenants?.id }} className="font-medium hover:underline">
-                      {c.tenants?.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.properties?.name}</TableCell>
-                  <TableCell>{formatDateBR(c.start_date)}</TableCell>
-                  <TableCell>{c.end_date ? formatDateBR(c.end_date) : "Indeterminado"}</TableCell>
-                  <TableCell className="text-right">{brl(c.rent_amount)}</TableCell>
-                  <TableCell className="text-center">dia {c.due_day}</TableCell>
-                  <TableCell><StatusBadge status={c.status} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+      <div className="p-8 space-y-4">
+        <Input placeholder="Buscar inquilino ou imóvel..." value={q} onChange={e => setQ(e.target.value)} className="max-w-md" />
+        <Accordion type="multiple" defaultValue={groups.map(([k]) => k)} className="space-y-2">
+          {groups.map(([letter, items]) => (
+            <AccordionItem key={letter} value={letter} className="border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <div className="size-8 rounded-md bg-primary/10 text-primary font-bold flex items-center justify-center">{letter}</div>
+                  <span className="font-semibold">{letter}</span>
+                  <Badge variant="secondary">{items.length}</Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <Card>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Inquilino</TableHead>
+                        <TableHead>Imóvel</TableHead>
+                        <TableHead>Início</TableHead>
+                        <TableHead>Fim</TableHead>
+                        <TableHead className="text-right">Aluguel</TableHead>
+                        <TableHead className="text-center">Venc.</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((c: any) => (
+                        <TableRow key={c.id}>
+                          <TableCell><Link to="/inquilinos/$id" params={{ id: c.tenants?.id }} className="font-medium hover:underline">{c.tenants?.name}</Link></TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{c.properties?.name}</TableCell>
+                          <TableCell>{formatDateBR(c.start_date)}</TableCell>
+                          <TableCell>{c.end_date ? formatDateBR(c.end_date) : "—"}</TableCell>
+                          <TableCell className="text-right">{brl(c.rent_amount)}</TableCell>
+                          <TableCell className="text-center">dia {c.due_day}</TableCell>
+                          <TableCell><StatusBadge status={c.status} /></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+          {groups.length === 0 && <Card className="p-8 text-center text-muted-foreground">Nenhum contrato.</Card>}
+        </Accordion>
       </div>
       <NewContractDialog open={open} onClose={() => setOpen(false)} />
     </div>
