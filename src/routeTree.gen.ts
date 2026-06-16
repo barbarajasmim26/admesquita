@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as RecibosRouteImport } from './routes/recibos'
+import { Route as InquilinosRouteImport } from './routes/inquilinos'
 import { Route as InadimplenciaRouteImport } from './routes/inadimplencia'
 import { Route as ImoveisRouteImport } from './routes/imoveis'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
@@ -41,6 +42,11 @@ const RelatoriosRoute = RelatoriosRouteImport.update({
 const RecibosRoute = RecibosRouteImport.update({
   id: '/recibos',
   path: '/recibos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InquilinosRoute = InquilinosRouteImport.update({
+  id: '/inquilinos',
+  path: '/inquilinos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InadimplenciaRoute = InadimplenciaRouteImport.update({
@@ -94,9 +100,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const InquilinosIndexRoute = InquilinosIndexRouteImport.update({
-  id: '/inquilinos/',
-  path: '/inquilinos/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => InquilinosRoute,
 } as any)
 const ExInquilinosIndexRoute = ExInquilinosIndexRouteImport.update({
   id: '/ex-inquilinos/',
@@ -104,9 +110,9 @@ const ExInquilinosIndexRoute = ExInquilinosIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const InquilinosIdRoute = InquilinosIdRouteImport.update({
-  id: '/inquilinos/$id',
-  path: '/inquilinos/$id',
-  getParentRoute: () => rootRouteImport,
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => InquilinosRoute,
 } as any)
 const ImoveisIdRoute = ImoveisIdRouteImport.update({
   id: '/$id',
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof FinanceiroRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
+  '/inquilinos': typeof InquilinosRouteWithChildren
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
   '/whatsapp': typeof WhatsappRoute
@@ -171,6 +178,7 @@ export interface FileRoutesById {
   '/financeiro': typeof FinanceiroRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
+  '/inquilinos': typeof InquilinosRouteWithChildren
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
   '/whatsapp': typeof WhatsappRoute
@@ -193,6 +201,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/imoveis'
     | '/inadimplencia'
+    | '/inquilinos'
     | '/recibos'
     | '/relatorios'
     | '/whatsapp'
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/imoveis'
     | '/inadimplencia'
+    | '/inquilinos'
     | '/recibos'
     | '/relatorios'
     | '/whatsapp'
@@ -254,13 +264,12 @@ export interface RootRouteChildren {
   FinanceiroRoute: typeof FinanceiroRoute
   ImoveisRoute: typeof ImoveisRouteWithChildren
   InadimplenciaRoute: typeof InadimplenciaRoute
+  InquilinosRoute: typeof InquilinosRouteWithChildren
   RecibosRoute: typeof RecibosRoute
   RelatoriosRoute: typeof RelatoriosRoute
   WhatsappRoute: typeof WhatsappRoute
   ExInquilinosIdRoute: typeof ExInquilinosIdRoute
-  InquilinosIdRoute: typeof InquilinosIdRoute
   ExInquilinosIndexRoute: typeof ExInquilinosIndexRoute
-  InquilinosIndexRoute: typeof InquilinosIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -284,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/recibos'
       fullPath: '/recibos'
       preLoaderRoute: typeof RecibosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inquilinos': {
+      id: '/inquilinos'
+      path: '/inquilinos'
+      fullPath: '/inquilinos'
+      preLoaderRoute: typeof InquilinosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inadimplencia': {
@@ -358,10 +374,10 @@ declare module '@tanstack/react-router' {
     }
     '/inquilinos/': {
       id: '/inquilinos/'
-      path: '/inquilinos'
+      path: '/'
       fullPath: '/inquilinos/'
       preLoaderRoute: typeof InquilinosIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof InquilinosRoute
     }
     '/ex-inquilinos/': {
       id: '/ex-inquilinos/'
@@ -372,10 +388,10 @@ declare module '@tanstack/react-router' {
     }
     '/inquilinos/$id': {
       id: '/inquilinos/$id'
-      path: '/inquilinos/$id'
+      path: '/$id'
       fullPath: '/inquilinos/$id'
       preLoaderRoute: typeof InquilinosIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof InquilinosRoute
     }
     '/imoveis/$id': {
       id: '/imoveis/$id'
@@ -405,6 +421,20 @@ const ImoveisRouteChildren: ImoveisRouteChildren = {
 const ImoveisRouteWithChildren =
   ImoveisRoute._addFileChildren(ImoveisRouteChildren)
 
+interface InquilinosRouteChildren {
+  InquilinosIdRoute: typeof InquilinosIdRoute
+  InquilinosIndexRoute: typeof InquilinosIndexRoute
+}
+
+const InquilinosRouteChildren: InquilinosRouteChildren = {
+  InquilinosIdRoute: InquilinosIdRoute,
+  InquilinosIndexRoute: InquilinosIndexRoute,
+}
+
+const InquilinosRouteWithChildren = InquilinosRoute._addFileChildren(
+  InquilinosRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
@@ -416,13 +446,12 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceiroRoute: FinanceiroRoute,
   ImoveisRoute: ImoveisRouteWithChildren,
   InadimplenciaRoute: InadimplenciaRoute,
+  InquilinosRoute: InquilinosRouteWithChildren,
   RecibosRoute: RecibosRoute,
   RelatoriosRoute: RelatoriosRoute,
   WhatsappRoute: WhatsappRoute,
   ExInquilinosIdRoute: ExInquilinosIdRoute,
-  InquilinosIdRoute: InquilinosIdRoute,
   ExInquilinosIndexRoute: ExInquilinosIndexRoute,
-  InquilinosIndexRoute: InquilinosIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
