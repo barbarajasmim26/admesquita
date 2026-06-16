@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { downloadContract } from "@/lib/contract-pdf";
+import { CONTRACT_TEMPLATES, findTemplateForProperty } from "@/lib/contract-templates";
 
 export function NewContractDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -31,6 +32,7 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
   }, [open]);
 
   const property: any = (props ?? []).find((p: any) => p.id === f.propertyId);
+  const selectedTemplate = CONTRACT_TEMPLATES.find((t) => t.id === f.templateId) ?? findTemplateForProperty(property?.name);
 
   async function submit(saveAlso: boolean) {
     if (!f.propertyId || !f.name || !f.rentAmount) {
@@ -53,7 +55,7 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
         tenantRg: f.rg,
         tenantCpf: f.cpf,
         tenantAddress: f.tenantAddress || (property?.address ?? ""),
-        propertyAddress: `${property?.address ?? property?.name}${f.houseNumber ? `, casa ${f.houseNumber}` : ""}`,
+        propertyAddress: `${selectedTemplate?.defaultAddress ?? property?.address ?? property?.name}${f.houseNumber ? `, casa ${f.houseNumber}` : ""}`,
         startDate: start,
         endDate: end,
         rentAmount: rent,
@@ -62,6 +64,7 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
         durationYears: Number(f.durationYears || 3),
         minStayYears: Number(f.minStayYears || 1),
         signDate: start,
+        forumCity: selectedTemplate?.forumCity,
       }, `contrato_${f.name.replace(/\s+/g, "_")}.pdf`);
 
       if (saveAlso) {
@@ -92,6 +95,19 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
+          <div>
+            <Label>Modelo de contrato (condomínio)</Label>
+            <Select value={f.templateId ?? ""} onValueChange={v => setF({ ...f, templateId: v })}>
+              <SelectTrigger><SelectValue placeholder="Auto pelo imóvel — ou escolha um modelo" /></SelectTrigger>
+              <SelectContent>
+                {CONTRACT_TEMPLATES.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {selectedTemplate && (
+              <p className="text-xs text-muted-foreground mt-1">Endereço base: {selectedTemplate.defaultAddress}</p>
+            )}
+          </div>
+
           <div>
             <Label>Imóvel *</Label>
             <Select value={f.propertyId ?? ""} onValueChange={v => setF({ ...f, propertyId: v })}>

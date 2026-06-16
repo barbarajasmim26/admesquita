@@ -24,6 +24,8 @@ import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InquilinosIndexRouteImport } from './routes/inquilinos.index'
+import { Route as ExInquilinosIndexRouteImport } from './routes/ex-inquilinos.index'
 import { Route as InquilinosIdRouteImport } from './routes/inquilinos.$id'
 import { Route as ImoveisIdRouteImport } from './routes/imoveis.$id'
 import { Route as ExInquilinosIdRouteImport } from './routes/ex-inquilinos.$id'
@@ -103,6 +105,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InquilinosIndexRoute = InquilinosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InquilinosRoute,
+} as any)
+const ExInquilinosIndexRoute = ExInquilinosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ExInquilinosRoute,
+} as any)
 const InquilinosIdRoute = InquilinosIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -138,6 +150,8 @@ export interface FileRoutesByFullPath {
   '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
   '/imoveis/$id': typeof ImoveisIdRoute
   '/inquilinos/$id': typeof InquilinosIdRoute
+  '/ex-inquilinos/': typeof ExInquilinosIndexRoute
+  '/inquilinos/': typeof InquilinosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,17 +161,17 @@ export interface FileRoutesByTo {
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
-  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
-  '/inquilinos': typeof InquilinosRouteWithChildren
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
   '/whatsapp': typeof WhatsappRoute
   '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
   '/imoveis/$id': typeof ImoveisIdRoute
   '/inquilinos/$id': typeof InquilinosIdRoute
+  '/ex-inquilinos': typeof ExInquilinosIndexRoute
+  '/inquilinos': typeof InquilinosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -179,6 +193,8 @@ export interface FileRoutesById {
   '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
   '/imoveis/$id': typeof ImoveisIdRoute
   '/inquilinos/$id': typeof InquilinosIdRoute
+  '/ex-inquilinos/': typeof ExInquilinosIndexRoute
+  '/inquilinos/': typeof InquilinosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -201,6 +217,8 @@ export interface FileRouteTypes {
     | '/ex-inquilinos/$id'
     | '/imoveis/$id'
     | '/inquilinos/$id'
+    | '/ex-inquilinos/'
+    | '/inquilinos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -210,17 +228,17 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/contratos'
     | '/crm'
-    | '/ex-inquilinos'
     | '/financeiro'
     | '/imoveis'
     | '/inadimplencia'
-    | '/inquilinos'
     | '/recibos'
     | '/relatorios'
     | '/whatsapp'
     | '/ex-inquilinos/$id'
     | '/imoveis/$id'
     | '/inquilinos/$id'
+    | '/ex-inquilinos'
+    | '/inquilinos'
   id:
     | '__root__'
     | '/'
@@ -241,6 +259,8 @@ export interface FileRouteTypes {
     | '/ex-inquilinos/$id'
     | '/imoveis/$id'
     | '/inquilinos/$id'
+    | '/ex-inquilinos/'
+    | '/inquilinos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -368,6 +388,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inquilinos/': {
+      id: '/inquilinos/'
+      path: '/'
+      fullPath: '/inquilinos/'
+      preLoaderRoute: typeof InquilinosIndexRouteImport
+      parentRoute: typeof InquilinosRoute
+    }
+    '/ex-inquilinos/': {
+      id: '/ex-inquilinos/'
+      path: '/'
+      fullPath: '/ex-inquilinos/'
+      preLoaderRoute: typeof ExInquilinosIndexRouteImport
+      parentRoute: typeof ExInquilinosRoute
+    }
     '/inquilinos/$id': {
       id: '/inquilinos/$id'
       path: '/$id'
@@ -394,10 +428,12 @@ declare module '@tanstack/react-router' {
 
 interface ExInquilinosRouteChildren {
   ExInquilinosIdRoute: typeof ExInquilinosIdRoute
+  ExInquilinosIndexRoute: typeof ExInquilinosIndexRoute
 }
 
 const ExInquilinosRouteChildren: ExInquilinosRouteChildren = {
   ExInquilinosIdRoute: ExInquilinosIdRoute,
+  ExInquilinosIndexRoute: ExInquilinosIndexRoute,
 }
 
 const ExInquilinosRouteWithChildren = ExInquilinosRoute._addFileChildren(
@@ -417,10 +453,12 @@ const ImoveisRouteWithChildren =
 
 interface InquilinosRouteChildren {
   InquilinosIdRoute: typeof InquilinosIdRoute
+  InquilinosIndexRoute: typeof InquilinosIndexRoute
 }
 
 const InquilinosRouteChildren: InquilinosRouteChildren = {
   InquilinosIdRoute: InquilinosIdRoute,
+  InquilinosIndexRoute: InquilinosIndexRoute,
 }
 
 const InquilinosRouteWithChildren = InquilinosRoute._addFileChildren(
