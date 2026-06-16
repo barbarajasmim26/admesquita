@@ -43,6 +43,7 @@ async function emitFromPayment(p: any, register: any) {
     referenceMonth: due.getMonth() + 1,
     referenceYear: due.getFullYear(),
     issueDate: p.paid_date ? new Date(p.paid_date + "T12:00:00") : new Date(),
+    pixPayer: tenant?.pix_payer ?? null,
   }, `recibo_${(tenant?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
   const ref = `${String(due.getMonth() + 1).padStart(2, "0")}/${due.getFullYear()}`;
   const r: any = await register({ data: { paymentId: p.id, tenantId: tenant?.id, amount, referenceMonth: ref } });

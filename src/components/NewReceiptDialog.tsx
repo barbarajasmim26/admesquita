@@ -53,6 +53,7 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
         referenceMonth: mm,
         referenceYear: yyyy,
         issueDate: new Date(issueDate + "T12:00:00"),
+        pixPayer: tenant.pix_payer ?? null,
       }, `recibo_${tenant.name.replace(/\s+/g, "_")}_${mm}_${yyyy}.pdf`);
       const r: any = await issue({ data: { tenantId: tenant.id, amount: val, referenceMonth: refMonth } });
       toast.success(`Recibo ${r.number} emitido!`);
