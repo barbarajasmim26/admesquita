@@ -14,7 +14,7 @@ import { Plus, Building2, Phone, Home, LayoutGrid, List } from "lucide-react";
 const opts = queryOptions({ queryKey: ["properties"], queryFn: () => listProperties() });
 const overdueOpts = queryOptions({ queryKey: ["overdue-by-tenant"], queryFn: () => listOverdueByTenant() });
 
-export const Route = createFileRoute("/inquilinos")({
+export const Route = createFileRoute("/inquilinos/")({
   head: () => ({ meta: [{ title: "Inquilinos — Mesquita Imóveis" }] }),
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(opts);
