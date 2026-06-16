@@ -51,43 +51,43 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.985 0.005 240);
-  --foreground: oklch(0.18 0.04 260);
+  /* Mesquita — tema rosé suave */
+  --background: oklch(0.985 0.012 350);
+  --foreground: oklch(0.22 0.04 350);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.04 260);
+  --card-foreground: oklch(0.22 0.04 350);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.04 260);
-  /* Mesquita brand navy */
-  --primary: oklch(0.32 0.12 263);
-  --primary-foreground: oklch(0.985 0.005 240);
-  --secondary: oklch(0.95 0.015 250);
-  --secondary-foreground: oklch(0.25 0.06 263);
-  --muted: oklch(0.96 0.008 250);
-  --muted-foreground: oklch(0.5 0.03 257);
-  --accent: oklch(0.93 0.04 263);
-  --accent-foreground: oklch(0.25 0.08 263);
+  --popover-foreground: oklch(0.22 0.04 350);
+  --primary: oklch(0.66 0.16 0);
+  --primary-foreground: oklch(0.99 0.005 350);
+  --secondary: oklch(0.95 0.025 350);
+  --secondary-foreground: oklch(0.35 0.08 0);
+  --muted: oklch(0.96 0.018 350);
+  --muted-foreground: oklch(0.5 0.04 350);
+  --accent: oklch(0.92 0.05 350);
+  --accent-foreground: oklch(0.35 0.1 0);
   --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0.005 240);
+  --destructive-foreground: oklch(0.99 0.005 350);
   --success: oklch(0.62 0.16 152);
-  --success-foreground: oklch(0.99 0.005 240);
+  --success-foreground: oklch(0.99 0.005 350);
   --warning: oklch(0.78 0.16 75);
   --warning-foreground: oklch(0.2 0.05 75);
-  --border: oklch(0.9 0.015 250);
-  --input: oklch(0.92 0.012 250);
-  --ring: oklch(0.32 0.12 263);
-  --chart-1: oklch(0.32 0.12 263);
+  --border: oklch(0.9 0.03 350);
+  --input: oklch(0.92 0.025 350);
+  --ring: oklch(0.66 0.16 0);
+  --chart-1: oklch(0.66 0.16 0);
   --chart-2: oklch(0.62 0.16 152);
   --chart-3: oklch(0.78 0.16 75);
   --chart-4: oklch(0.58 0.22 27);
-  --chart-5: oklch(0.55 0.1 263);
-  --sidebar: oklch(0.22 0.06 263);
-  --sidebar-foreground: oklch(0.95 0.01 250);
-  --sidebar-primary: oklch(0.65 0.15 263);
-  --sidebar-primary-foreground: oklch(0.99 0.005 240);
-  --sidebar-accent: oklch(0.28 0.07 263);
-  --sidebar-accent-foreground: oklch(0.98 0.005 240);
-  --sidebar-border: oklch(0.3 0.06 263);
-  --sidebar-ring: oklch(0.65 0.15 263);
+  --chart-5: oklch(0.55 0.1 320);
+  --sidebar: oklch(0.97 0.03 350);
+  --sidebar-foreground: oklch(0.3 0.06 350);
+  --sidebar-primary: oklch(0.66 0.16 0);
+  --sidebar-primary-foreground: oklch(0.99 0.005 350);
+  --sidebar-accent: oklch(0.93 0.045 350);
+  --sidebar-accent-foreground: oklch(0.35 0.1 0);
+  --sidebar-border: oklch(0.9 0.04 350);
+  --sidebar-ring: oklch(0.66 0.16 0);
 }
 
 .dark {
