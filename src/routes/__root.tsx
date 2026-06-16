@@ -8,6 +8,9 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { AppLayout } from "@/components/AppLayout";
+import { AccessGate } from "@/components/AccessGate";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -77,14 +80,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Mesquita Imóveis — Gestão" },
+      { name: "description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
+      { name: "robots", content: "noindex,nofollow" },
+      { property: "og:title", content: "Mesquita Imóveis — Gestão" },
+      { property: "og:description", content: "Sistema interno de gestão de imóveis e inquilinos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Mesquita Imóveis — Gestão" },
+      { name: "twitter:description", content: "Sistema interno de gestão de imóveis e inquilinos." },
     ],
     links: [
       {
@@ -118,8 +122,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AccessGate>
+        <AppLayout />
+      </AccessGate>
+      <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );
 }

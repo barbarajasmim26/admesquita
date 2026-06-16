@@ -9,38 +9,338 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WhatsappRouteImport } from './routes/whatsapp'
+import { Route as RelatoriosRouteImport } from './routes/relatorios'
+import { Route as RecibosRouteImport } from './routes/recibos'
+import { Route as InquilinosRouteImport } from './routes/inquilinos'
+import { Route as InadimplenciaRouteImport } from './routes/inadimplencia'
+import { Route as ImoveisRouteImport } from './routes/imoveis'
+import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as ExInquilinosRouteImport } from './routes/ex-inquilinos'
+import { Route as CrmRouteImport } from './routes/crm'
+import { Route as ContratosRouteImport } from './routes/contratos'
+import { Route as CalendarioRouteImport } from './routes/calendario'
+import { Route as AlertasRouteImport } from './routes/alertas'
+import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InquilinosIdRouteImport } from './routes/inquilinos.$id'
+import { Route as ImoveisIdRouteImport } from './routes/imoveis.$id'
+import { Route as ExInquilinosIdRouteImport } from './routes/ex-inquilinos.$id'
 
+const WhatsappRoute = WhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatoriosRoute = RelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecibosRoute = RecibosRouteImport.update({
+  id: '/recibos',
+  path: '/recibos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InquilinosRoute = InquilinosRouteImport.update({
+  id: '/inquilinos',
+  path: '/inquilinos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InadimplenciaRoute = InadimplenciaRouteImport.update({
+  id: '/inadimplencia',
+  path: '/inadimplencia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImoveisRoute = ImoveisRouteImport.update({
+  id: '/imoveis',
+  path: '/imoveis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceiroRoute = FinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExInquilinosRoute = ExInquilinosRouteImport.update({
+  id: '/ex-inquilinos',
+  path: '/ex-inquilinos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmRoute = CrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContratosRoute = ContratosRouteImport.update({
+  id: '/contratos',
+  path: '/contratos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalendarioRoute = CalendarioRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertasRoute = AlertasRouteImport.update({
+  id: '/alertas',
+  path: '/alertas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgendaRoute = AgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InquilinosIdRoute = InquilinosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => InquilinosRoute,
+} as any)
+const ImoveisIdRoute = ImoveisIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ImoveisRoute,
+} as any)
+const ExInquilinosIdRoute = ExInquilinosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ExInquilinosRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
+  '/alertas': typeof AlertasRoute
+  '/calendario': typeof CalendarioRoute
+  '/contratos': typeof ContratosRoute
+  '/crm': typeof CrmRoute
+  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
+  '/financeiro': typeof FinanceiroRoute
+  '/imoveis': typeof ImoveisRouteWithChildren
+  '/inadimplencia': typeof InadimplenciaRoute
+  '/inquilinos': typeof InquilinosRouteWithChildren
+  '/recibos': typeof RecibosRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/whatsapp': typeof WhatsappRoute
+  '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
+  '/imoveis/$id': typeof ImoveisIdRoute
+  '/inquilinos/$id': typeof InquilinosIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
+  '/alertas': typeof AlertasRoute
+  '/calendario': typeof CalendarioRoute
+  '/contratos': typeof ContratosRoute
+  '/crm': typeof CrmRoute
+  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
+  '/financeiro': typeof FinanceiroRoute
+  '/imoveis': typeof ImoveisRouteWithChildren
+  '/inadimplencia': typeof InadimplenciaRoute
+  '/inquilinos': typeof InquilinosRouteWithChildren
+  '/recibos': typeof RecibosRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/whatsapp': typeof WhatsappRoute
+  '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
+  '/imoveis/$id': typeof ImoveisIdRoute
+  '/inquilinos/$id': typeof InquilinosIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
+  '/alertas': typeof AlertasRoute
+  '/calendario': typeof CalendarioRoute
+  '/contratos': typeof ContratosRoute
+  '/crm': typeof CrmRoute
+  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
+  '/financeiro': typeof FinanceiroRoute
+  '/imoveis': typeof ImoveisRouteWithChildren
+  '/inadimplencia': typeof InadimplenciaRoute
+  '/inquilinos': typeof InquilinosRouteWithChildren
+  '/recibos': typeof RecibosRoute
+  '/relatorios': typeof RelatoriosRoute
+  '/whatsapp': typeof WhatsappRoute
+  '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
+  '/imoveis/$id': typeof ImoveisIdRoute
+  '/inquilinos/$id': typeof InquilinosIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/agenda'
+    | '/alertas'
+    | '/calendario'
+    | '/contratos'
+    | '/crm'
+    | '/ex-inquilinos'
+    | '/financeiro'
+    | '/imoveis'
+    | '/inadimplencia'
+    | '/inquilinos'
+    | '/recibos'
+    | '/relatorios'
+    | '/whatsapp'
+    | '/ex-inquilinos/$id'
+    | '/imoveis/$id'
+    | '/inquilinos/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/agenda'
+    | '/alertas'
+    | '/calendario'
+    | '/contratos'
+    | '/crm'
+    | '/ex-inquilinos'
+    | '/financeiro'
+    | '/imoveis'
+    | '/inadimplencia'
+    | '/inquilinos'
+    | '/recibos'
+    | '/relatorios'
+    | '/whatsapp'
+    | '/ex-inquilinos/$id'
+    | '/imoveis/$id'
+    | '/inquilinos/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/agenda'
+    | '/alertas'
+    | '/calendario'
+    | '/contratos'
+    | '/crm'
+    | '/ex-inquilinos'
+    | '/financeiro'
+    | '/imoveis'
+    | '/inadimplencia'
+    | '/inquilinos'
+    | '/recibos'
+    | '/relatorios'
+    | '/whatsapp'
+    | '/ex-inquilinos/$id'
+    | '/imoveis/$id'
+    | '/inquilinos/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgendaRoute: typeof AgendaRoute
+  AlertasRoute: typeof AlertasRoute
+  CalendarioRoute: typeof CalendarioRoute
+  ContratosRoute: typeof ContratosRoute
+  CrmRoute: typeof CrmRoute
+  ExInquilinosRoute: typeof ExInquilinosRouteWithChildren
+  FinanceiroRoute: typeof FinanceiroRoute
+  ImoveisRoute: typeof ImoveisRouteWithChildren
+  InadimplenciaRoute: typeof InadimplenciaRoute
+  InquilinosRoute: typeof InquilinosRouteWithChildren
+  RecibosRoute: typeof RecibosRoute
+  RelatoriosRoute: typeof RelatoriosRoute
+  WhatsappRoute: typeof WhatsappRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/whatsapp': {
+      id: '/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof WhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorios': {
+      id: '/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof RelatoriosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recibos': {
+      id: '/recibos'
+      path: '/recibos'
+      fullPath: '/recibos'
+      preLoaderRoute: typeof RecibosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inquilinos': {
+      id: '/inquilinos'
+      path: '/inquilinos'
+      fullPath: '/inquilinos'
+      preLoaderRoute: typeof InquilinosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inadimplencia': {
+      id: '/inadimplencia'
+      path: '/inadimplencia'
+      fullPath: '/inadimplencia'
+      preLoaderRoute: typeof InadimplenciaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/imoveis': {
+      id: '/imoveis'
+      path: '/imoveis'
+      fullPath: '/imoveis'
+      preLoaderRoute: typeof ImoveisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financeiro': {
+      id: '/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof FinanceiroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ex-inquilinos': {
+      id: '/ex-inquilinos'
+      path: '/ex-inquilinos'
+      fullPath: '/ex-inquilinos'
+      preLoaderRoute: typeof ExInquilinosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm': {
+      id: '/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof CrmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contratos': {
+      id: '/contratos'
+      path: '/contratos'
+      fullPath: '/contratos'
+      preLoaderRoute: typeof ContratosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendario': {
+      id: '/calendario'
+      path: '/calendario'
+      fullPath: '/calendario'
+      preLoaderRoute: typeof CalendarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alertas': {
+      id: '/alertas'
+      path: '/alertas'
+      fullPath: '/alertas'
+      preLoaderRoute: typeof AlertasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agenda': {
+      id: '/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +348,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inquilinos/$id': {
+      id: '/inquilinos/$id'
+      path: '/$id'
+      fullPath: '/inquilinos/$id'
+      preLoaderRoute: typeof InquilinosIdRouteImport
+      parentRoute: typeof InquilinosRoute
+    }
+    '/imoveis/$id': {
+      id: '/imoveis/$id'
+      path: '/$id'
+      fullPath: '/imoveis/$id'
+      preLoaderRoute: typeof ImoveisIdRouteImport
+      parentRoute: typeof ImoveisRoute
+    }
+    '/ex-inquilinos/$id': {
+      id: '/ex-inquilinos/$id'
+      path: '/$id'
+      fullPath: '/ex-inquilinos/$id'
+      preLoaderRoute: typeof ExInquilinosIdRouteImport
+      parentRoute: typeof ExInquilinosRoute
+    }
   }
 }
 
+interface ExInquilinosRouteChildren {
+  ExInquilinosIdRoute: typeof ExInquilinosIdRoute
+}
+
+const ExInquilinosRouteChildren: ExInquilinosRouteChildren = {
+  ExInquilinosIdRoute: ExInquilinosIdRoute,
+}
+
+const ExInquilinosRouteWithChildren = ExInquilinosRoute._addFileChildren(
+  ExInquilinosRouteChildren,
+)
+
+interface ImoveisRouteChildren {
+  ImoveisIdRoute: typeof ImoveisIdRoute
+}
+
+const ImoveisRouteChildren: ImoveisRouteChildren = {
+  ImoveisIdRoute: ImoveisIdRoute,
+}
+
+const ImoveisRouteWithChildren =
+  ImoveisRoute._addFileChildren(ImoveisRouteChildren)
+
+interface InquilinosRouteChildren {
+  InquilinosIdRoute: typeof InquilinosIdRoute
+}
+
+const InquilinosRouteChildren: InquilinosRouteChildren = {
+  InquilinosIdRoute: InquilinosIdRoute,
+}
+
+const InquilinosRouteWithChildren = InquilinosRoute._addFileChildren(
+  InquilinosRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgendaRoute: AgendaRoute,
+  AlertasRoute: AlertasRoute,
+  CalendarioRoute: CalendarioRoute,
+  ContratosRoute: ContratosRoute,
+  CrmRoute: CrmRoute,
+  ExInquilinosRoute: ExInquilinosRouteWithChildren,
+  FinanceiroRoute: FinanceiroRoute,
+  ImoveisRoute: ImoveisRouteWithChildren,
+  InadimplenciaRoute: InadimplenciaRoute,
+  InquilinosRoute: InquilinosRouteWithChildren,
+  RecibosRoute: RecibosRoute,
+  RelatoriosRoute: RelatoriosRoute,
+  WhatsappRoute: WhatsappRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -1,0 +1,1 @@
+ALTER TABLE public.former_tenants ALTER COLUMN exit_date DROP NOT NULL;
