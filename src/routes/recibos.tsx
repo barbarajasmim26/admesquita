@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { brl, formatDateBR } from "@/lib/finance";
 import { downloadReceipt } from "@/lib/receipt-pdf";
-import { FileDown, Sparkles, Plus, Copy } from "lucide-react";
+import { FileDown, Sparkles, Plus, Copy, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { NewReceiptDialog } from "@/components/NewReceiptDialog";
 
@@ -76,6 +76,24 @@ function Page() {
     qc.invalidateQueries({ queryKey: ["receipts"] });
   }
 
+  async function downloadBlank() {
+    try {
+      const now = new Date();
+      await downloadReceipt({
+        tenantName: "____________________________________",
+        tenantCpf: "____________",
+        amount: 0,
+        propertyName: "",
+        propertyAddress: "____________________________________",
+        houseNumber: null,
+        referenceMonth: now.getMonth() + 1,
+        referenceYear: now.getFullYear(),
+        issueDate: now,
+      }, "modelo_recibo.pdf");
+      toast.success("Modelo de recibo baixado");
+    } catch (e: any) { toast.error(e.message ?? "Erro"); }
+  }
+
   function duplicate(r: any) {
     setPrefill({
       propertyId: r.tenants?.properties?.id,
@@ -92,6 +110,9 @@ function Page() {
         description={`${history.length} recibo(s) emitido(s)`}
         actions={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={downloadBlank} className="gap-2">
+              <FileText className="size-4" /> Modelo original
+            </Button>
             <Button variant="outline" onClick={testReceipt} className="gap-2">
               <Sparkles className="size-4" /> Teste
             </Button>
