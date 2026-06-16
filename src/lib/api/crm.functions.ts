@@ -295,7 +295,7 @@ export const upsertTenant = createServerFn({ method: "POST" })
   .inputValidator((d: {
     id?: string; name: string; propertyId: string; phone?: string; email?: string; cpf?: string;
     houseNumber?: string; rentAmount: number; dueDay: number; deposit?: number; startDate: string;
-    lateFeePercent?: number; interestPercent?: number; notes?: string;
+    lateFeePercent?: number; interestPercent?: number; notes?: string; pixPayer?: string;
   }) => d)
   .handler(async ({ data }) => {
     const s = await admin();
@@ -313,6 +313,7 @@ export const upsertTenant = createServerFn({ method: "POST" })
       late_fee_percent: data.lateFeePercent ?? 2,
       interest_percent: data.interestPercent ?? 1,
       notes: data.notes || null,
+      pix_payer: data.pixPayer || null,
       status: "active",
     };
     if (data.id) {

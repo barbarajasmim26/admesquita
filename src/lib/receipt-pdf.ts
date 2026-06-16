@@ -13,10 +13,10 @@ export interface ReceiptData {
   referenceMonth: number; // 1-12
   referenceYear: number;
   issueDate?: Date;
+  pixPayer?: string | null;
 }
 
 const FIXED = {
-  pixPayer: "ILONEIDE MIRANDA DA SILVA",
   signerName: "Maria Eneide da Silva - LOCADORA",
   city: "Fortaleza",
 };
@@ -77,7 +77,7 @@ export async function generateReceiptPDF(d: ReceiptData): Promise<Blob> {
     { text: d.tenantName.toUpperCase(), bold: true },
     { text: `, brasileiro(a)${cpfTxt}, o valor de `, bold: false },
     { text: `${valor} (${extenso})`, bold: true },
-    { text: ` via pix por ${FIXED.pixPayer}, valor este referente ao aluguel do mês de ${mes}, do imóvel localizado na ${address}`, bold: false },
+    { text: `${d.pixPayer ? ` via pix por ${d.pixPayer}` : " via pix"}, valor este referente ao aluguel do mês de ${mes}, do imóvel localizado na ${address}`, bold: false },
   ];
 
   // Word-by-word layout preserving bold
