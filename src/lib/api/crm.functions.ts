@@ -179,6 +179,49 @@ export const unmarkPayment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Manually set / create / clear the payment for a tenant in a specific month.
+// status: 'paid' | 'pending' | 'overdue' | 'none' (none = delete the row)
+export const setMonthStatus = createServerFn({ method: "POST" })
+  .inputValidator((d: { tenantId: string; year: number; month: number; status: "paid" | "pending" | "overdue" | "none" }) => d)
+  .handler(async ({ data }) => {
+    const s = await admin();
+    const { data: t } = await s.from("tenants").select("id, rent_amount, due_day").eq("id", data.tenantId).single();
+    if (!t) throw new Error("Inquilino não encontrado");
+    const mm = String(data.month).padStart(2, "0");
+    const start = `${data.year}-${mm}-01`;
+    const lastDay = new Date(data.year, data.month, 0).getDate();
+    const end = `${data.year}-${mm}-${String(lastDay).padStart(2, "0")}`;
+    const { data: existing } = await s.from("payments")
+      .select("id").eq("tenant_id", data.tenantId).gte("due_date", start).lte("due_date", end).limit(1).maybeSingle();
+
+    if (data.status === "none") {
+      if (existing) await s.from("payments").delete().eq("id", existing.id);
+      return { ok: true };
+    }
+
+    let paymentId = existing?.id;
+    if (!paymentId) {
+      const { data: ct } = await s.from("contracts").select("id").eq("tenant_id", data.tenantId).eq("status", "active").limit(1).maybeSingle();
+      if (!ct) throw new Error("Contrato ativo não encontrado");
+      const dueDay = Math.min(Number(t.due_day ?? 10), lastDay);
+      const dueDate = `${data.year}-${mm}-${String(dueDay).padStart(2, "0")}`;
+      const { data: row, error } = await s.from("payments").insert({
+        tenant_id: data.tenantId, contract_id: ct.id,
+        amount: Number(t.rent_amount ?? 0), due_date: dueDate, status: "pending",
+      }).select("id").single();
+      if (error) throw error;
+      paymentId = row.id;
+    }
+
+    if (data.status === "paid") {
+      const today = new Date().toISOString().slice(0, 10);
+      await s.from("payments").update({ status: "paid", paid_date: today, paid_amount: Number(t.rent_amount ?? 0) }).eq("id", paymentId);
+    } else {
+      await s.from("payments").update({ status: data.status, paid_date: null, paid_amount: null, late_fee: 0, interest: 0 }).eq("id", paymentId);
+    }
+    return { ok: true };
+  });
+
 export const createCharge = createServerFn({ method: "POST" })
   .inputValidator((d: { tenantId: string; amount: number; dueDate: string; notes?: string }) => d)
   .handler(async ({ data }) => {
