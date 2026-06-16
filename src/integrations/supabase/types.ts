@@ -418,36 +418,6 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          cnpj: string | null
-          company_name: string | null
-          created_at: string
-          full_name: string | null
-          id: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          cnpj?: string | null
-          company_name?: string | null
-          created_at?: string
-          full_name?: string | null
-          id: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          cnpj?: string | null
-          company_name?: string | null
-          created_at?: string
-          full_name?: string | null
-          id?: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       properties: {
         Row: {
           address: string | null
