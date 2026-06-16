@@ -10,6 +10,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AppLayout } from "@/components/AppLayout";
+import { AccessGate } from "@/components/AccessGate";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -79,18 +80,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "System Booster enhances system management by organizing and streamlining rental property operations." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "System Booster enhances system management by organizing and streamlining rental property operations." },
+      { title: "Mesquita Imóveis — Gestão" },
+      { name: "description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
+      { name: "robots", content: "noindex,nofollow" },
+      { property: "og:title", content: "Mesquita Imóveis — Gestão" },
+      { property: "og:description", content: "Sistema interno de gestão de imóveis e inquilinos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "System Booster enhances system management by organizing and streamlining rental property operations." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0ddb9016-9971-4839-8b6e-a1d194f244f3/id-preview-10869dbb--d04e4db7-7d61-4ed4-8bcd-15f845f7d544.lovable.app-1781319586458.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0ddb9016-9971-4839-8b6e-a1d194f244f3/id-preview-10869dbb--d04e4db7-7d61-4ed4-8bcd-15f845f7d544.lovable.app-1781319586458.png" },
+      { name: "twitter:title", content: "Mesquita Imóveis — Gestão" },
+      { name: "twitter:description", content: "Sistema interno de gestão de imóveis e inquilinos." },
     ],
     links: [
       {
@@ -124,7 +122,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppLayout />
+      <AccessGate>
+        <AppLayout />
+      </AccessGate>
       <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );
