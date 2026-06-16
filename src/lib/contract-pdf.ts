@@ -175,13 +175,13 @@ export async function generateContractPDF(d: ContractData): Promise<Blob> {
 
   writeTokens([
     { text: "CLÁUSULA 3ª", bold: true },
-    { text: ` - O valor inicial do caução de ${brl(d.depositAmount)} (${brlExtenso(d.depositAmount)}) e do aluguel é de ${brl(d.rentAmount)} (${brlExtenso(d.rentAmount)}) mensais, o qual deve ser pago impreterivelmente até o dia ${d.dueDay} de cada mês subsequente ao vencido, via boleto, transferência bancária, PIX, ou por outro meio que venha a ser acordado com o LOCADOR.` },
+    { text: ` - O valor inicial do caução de ${brl(d.depositAmount).replace("R$ ", "")} (${brlExtenso(d.depositAmount)}) e do aluguel é de ${brl(d.rentAmount)} (${brlExtenso(d.rentAmount)}) mensais, o qual deve ser pago impreterivelmente até o dia ${d.dueDay} de cada mês subsequente ao vencido, via boleto, transferência bancária, PIX, ou por outro meio que venha a ser acordado com o LOCADOR.` },
   ]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: ` O aluguel será reajustado anualmente de acordo com a variação do ${c.readjustmentIndex} dos meses anteriores; e na sua falta, por outro índice que venha a substitui-lo.` }]);
 
   writeTokens([{ text: "CLÁUSULA 4ª", bold: true }, { text: " - O LOCATÁRIO deve pagar ao LOCADOR, no início da locação, uma caução em dinheiro no valor designado na Cláusula 3ª." }]);
 
-  section("DIREITOS, OBRIGAÇÕES DAS PARTES E CLÁUSULAS PENAIS");
+  section("DIRETOS, OBRIGAÇÕES DAS PARTES E CLÁUSULAS PENAIS");
   writeTokens([{ text: "CLÁUSULA 5ª", bold: true }, { text: " - O LOCADOR deve entregar o imóvel em bom estado de conservação a servir ao uso a que se destina, permitindo ao LOCATÁRIO a utilização pacífica do imóvel locado." }]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: " O LOCATÁRIO declara receber o imóvel em perfeito estado de conservação e de funcionamento." }]);
   writeTokens([{ text: "CLÁUSULA 6ª", bold: true }, { text: " - O LOCATÁRIO declara, que o imóvel ora locado, destina-se única, exclusivamente para o seu uso residencial e de sua família. E desde logo, se obriga a servir-se do prédio para o uso convencionado, devendo tratá-lo com o mesmo cuidado como se fosse seu." }]);
@@ -193,8 +193,8 @@ export async function generateContractPDF(d: ContractData): Promise<Blob> {
   writeTokens([{ text: "CLÁUSULA 11ª", bold: true }, { text: " - Caso o LOCATÁRIO não conserve o imóvel, realize demolições ou outras práticas que venham a afetar a segurança do prédio, fica estipulada multa compensatória no valor de 10 (dez) alugueis vigentes a data do fato." }]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: " Por ventura os danos causados superem o valor da multa prevista no caput, deverá o LOCATÁRIO pagar todas as despesas necessárias ao reparo do imóvel até o limite da danificação." }]);
   writeTokens([{ text: "CLÁUSULA 12ª", bold: true }, { text: " - O LOCATÁRIO deve pagar pontualmente o aluguel e os demais encargos da locação, legal ou contratualmente exigíveis, conforme o prazo estipulado neste contrato." }]);
-  writeTokens([{ text: "Parágrafo único.", bold: true }, { text: ` Em caso de mora no pagamento do aluguel, será aplicada multa de ${c.lateFeePercent}% sobre o valor devido pelo inadimplemento; juros mensais de ${c.interestPercent}% por mês de atraso, além de correção monetária a ser calculada entre a data do vencimento e a do efetivo pagamento.` }]);
-  writeTokens([{ text: "CLÁUSULA 13ª", bold: true }, { text: " - O LOCADOR deve fornecer ao LOCATÁRIO recibo discriminado de todas as importâncias pagas. Além de exibir, quando solicitado, os comprovantes relativos às parcelas que estejam sendo exigidas." }]);
+  writeTokens([{ text: "Parágrafo único.", bold: true }, { text: ` Em caso de mora no pagamento do aluguel, será aplicada multa de ${c.lateFeePercent}% (dez por cento) sobre o valor devido pelo inadimplemento; juros mensais de ${c.interestPercent}% (um por cento) por mês de atraso, além de correção monetária a ser calculada entre a data do vencimento e a do efetivo pagamento.` }]);
+  writeTokens([{ text: "CLÁUSULA 13ª", bold: true }, { text: " - O LOCADOR deve fornecer ao LOCATÁRIO recibo descriminado de todas as importâncias pagas. Além de exibir, quando solicitado, os comprovantes relativos às parcelas que estejam sendo exigidas." }]);
   writeTokens([{ text: "CLÁUSULA 14ª", bold: true }, { text: " - O LOCATÁRIO será responsável pelo pagamento de impostos e taxas provenientes do imóvel à arrecadação pública (como IPTU), prêmio de seguro complementar contra fogo; além daquelas provenientes de sua utilização, como ligação e consumo de luz, força, água, gás e esgoto, que serão pagas diretamente às empresas concessionárias/órgãos públicos competentes pelos referidos serviços." }]);
   writeTokens([{ text: "CLÁUSULA 15ª", bold: true }, { text: " - O LOCATÁRIO que desejar devolver o imóvel, deve comunicar ao LOCADOR da sua desistência, com antecedência mínima de 30 (trinta) dias." }]);
   writeTokens([{ text: "CLÁUSULA 16ª", bold: true }, { text: " - Em caso de devolução antecipada do imóvel durante os seis primeiros meses da locação, o LOCATÁRIO deverá pagar multa compensatória em dinheiro no valor de 1 (um) aluguel vigente." }]);

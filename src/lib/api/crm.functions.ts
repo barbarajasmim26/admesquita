@@ -136,7 +136,7 @@ export const listPayments = createServerFn({ method: "GET" })
     const s = await admin();
     let q = s.from("payments").select(
       "id, amount, paid_amount, due_date, paid_date, status, late_fee, interest, notes, tenant_id, contract_id, " +
-      "tenants(id, name, phone, late_fee_percent, interest_percent, house_number, cpf, properties(id, name, address))"
+      "tenants(id, name, phone, late_fee_percent, interest_percent, house_number, cpf, pix_payer, properties(id, name, address))"
     ).order("due_date", { ascending: false });
     if (data.status && data.status !== "all") q = q.eq("status", data.status);
     if (data.tenantId) q = q.eq("tenant_id", data.tenantId);
@@ -242,7 +242,7 @@ export const getPaymentForReceipt = createServerFn({ method: "GET" })
     const s = await admin();
     const { data: p, error } = await s.from("payments").select(
       "id, amount, paid_amount, due_date, paid_date, status, contract_id, tenant_id, " +
-      "tenants(id, name, cpf, phone, house_number, late_fee_percent, interest_percent, properties(id, name, address))"
+      "tenants(id, name, cpf, phone, house_number, late_fee_percent, interest_percent, pix_payer, properties(id, name, address))"
     ).eq("id", data.paymentId).single();
     if (error) throw error;
     return p;
@@ -295,7 +295,7 @@ export const upsertTenant = createServerFn({ method: "POST" })
   .inputValidator((d: {
     id?: string; name: string; propertyId: string; phone?: string; email?: string; cpf?: string;
     houseNumber?: string; rentAmount: number; dueDay: number; deposit?: number; startDate: string;
-    lateFeePercent?: number; interestPercent?: number; notes?: string;
+    lateFeePercent?: number; interestPercent?: number; notes?: string; pixPayer?: string;
   }) => d)
   .handler(async ({ data }) => {
     const s = await admin();
@@ -313,6 +313,7 @@ export const upsertTenant = createServerFn({ method: "POST" })
       late_fee_percent: data.lateFeePercent ?? 2,
       interest_percent: data.interestPercent ?? 1,
       notes: data.notes || null,
+      pix_payer: data.pixPayer || null,
       status: "active",
     };
     if (data.id) {
@@ -350,7 +351,7 @@ export const deactivateTenant = createServerFn({ method: "POST" })
 export const listProperties = createServerFn({ method: "GET" }).handler(async () => {
   const s = await admin();
   const { data: props } = await s.from("properties").select("*").order("name");
-  const { data: tenants } = await s.from("tenants").select("id, name, property_id, status, house_number, rent_amount, phone").eq("status", "active");
+  const { data: tenants } = await s.from("tenants").select("id, name, property_id, status, house_number, rent_amount, phone, cpf, pix_payer").eq("status", "active");
   return (props ?? []).map(p => ({
     ...p,
     tenants: (tenants ?? []).filter(t => t.property_id === p.id),

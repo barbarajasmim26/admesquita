@@ -24,6 +24,7 @@ export function TenantDialog({ open, onClose, tenant, defaultPropertyId }: { ope
       email: tenant?.email ?? "",
       cpf: tenant?.cpf ?? "",
       houseNumber: tenant?.house_number ?? "",
+      pixPayer: tenant?.pix_payer ?? "",
       rentAmount: tenant?.rent_amount ?? "",
       dueDay: tenant?.due_day ?? 5,
       deposit: tenant?.deposit ?? 0,
@@ -46,7 +47,7 @@ export function TenantDialog({ open, onClose, tenant, defaultPropertyId }: { ope
         houseNumber: form.houseNumber, rentAmount: Number(form.rentAmount), dueDay: Number(form.dueDay),
         deposit: Number(form.deposit || 0), startDate: form.startDate,
         lateFeePercent: Number(form.lateFeePercent || 0), interestPercent: Number(form.interestPercent || 0),
-        notes: form.notes,
+        notes: form.notes, pixPayer: form.pixPayer,
       } });
       toast.success(tenant?.id ? "Inquilino atualizado" : "Inquilino cadastrado");
       qc.invalidateQueries();
@@ -74,6 +75,7 @@ export function TenantDialog({ open, onClose, tenant, defaultPropertyId }: { ope
           <Field label="CPF"><Input value={form.cpf ?? ""} onChange={e => setForm({ ...form, cpf: e.target.value })} /></Field>
           <Field label="Telefone"><Input value={form.phone ?? ""} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
           <Field label="Email" className="col-span-2"><Input value={form.email ?? ""} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
+          <Field label="Pago por (PIX no recibo)" className="col-span-2"><Input value={form.pixPayer ?? ""} onChange={e => setForm({ ...form, pixPayer: e.target.value })} placeholder="Ex: João da Silva — deixe em branco para exibir só 'via pix'" /></Field>
           <Field label="Aluguel (R$) *"><Input type="number" step="0.01" value={form.rentAmount ?? ""} onChange={e => setForm({ ...form, rentAmount: e.target.value })} /></Field>
           <Field label="Dia vencimento"><Input type="number" min={1} max={31} value={form.dueDay ?? ""} onChange={e => setForm({ ...form, dueDay: e.target.value })} /></Field>
           <Field label="Depósito (R$)"><Input type="number" step="0.01" value={form.deposit ?? ""} onChange={e => setForm({ ...form, deposit: e.target.value })} /></Field>

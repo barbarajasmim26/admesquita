@@ -671,6 +671,7 @@ export type Database = {
           owner_id: string | null
           payment_cycle: string
           phone: string | null
+          pix_payer: string | null
           profession: string | null
           property_id: string
           rent_amount: number
@@ -698,6 +699,7 @@ export type Database = {
           owner_id?: string | null
           payment_cycle?: string
           phone?: string | null
+          pix_payer?: string | null
           profession?: string | null
           property_id: string
           rent_amount: number
@@ -725,6 +727,7 @@ export type Database = {
           owner_id?: string | null
           payment_cycle?: string
           phone?: string | null
+          pix_payer?: string | null
           profession?: string | null
           property_id?: string
           rent_amount?: number
