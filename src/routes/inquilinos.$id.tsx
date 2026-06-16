@@ -16,6 +16,7 @@ import { EndTenancyDialog } from "@/components/EndTenancyDialog";
 import { downloadContract } from "@/lib/contract-pdf";
 import { toast } from "sonner";
 import { MonthlyPaymentGrid } from "@/components/MonthlyPaymentGrid";
+import { chargeMessage, receiptMessage, waLink } from "@/lib/bot-templates";
 
 const opts = (id: string) => queryOptions({ queryKey: ["tenant", id], queryFn: () => getTenant({ data: { id } }) });
 
@@ -41,6 +42,27 @@ function Page() {
   const pendings = data.payments.filter((p: any) => p.status !== "paid");
   const totalDevido = pendings.reduce((a: number, p: any) => a + Number(p.amount ?? 0), 0);
 
+  const lastPaid = data.payments.find((p: any) => p.status === "paid");
+  const nextOverdue = pendings[pendings.length - 1];
+  const cobrancaLink = nextOverdue
+    ? waLink(t.phone, chargeMessage({
+        name: t.name,
+        amount: Number(nextOverdue.amount),
+        year: Number(nextOverdue.due_date.slice(0, 4)),
+        month: Number(nextOverdue.due_date.slice(5, 7)),
+        pix: t.pix_payer,
+        dueDay: t.due_day,
+      }))
+    : null;
+  const reciboLink = lastPaid
+    ? waLink(t.phone, receiptMessage({
+        name: t.name,
+        amount: Number(lastPaid.paid_amount ?? lastPaid.amount),
+        year: Number(lastPaid.due_date.slice(0, 4)),
+        month: Number(lastPaid.due_date.slice(5, 7)),
+      }))
+    : null;
+
   return (
     <div>
       <PageHeader title={t.name} description={`${t.properties?.name ?? ""} ${t.house_number ? `· casa ${t.house_number}` : ""}`}
@@ -51,6 +73,16 @@ function Page() {
             {phone && (
               <Button asChild variant="outline" size="sm">
                 <a href={`https://wa.me/55${phone}`} target="_blank" rel="noreferrer"><MessageCircle className="size-4 mr-1" />WhatsApp</a>
+              </Button>
+            )}
+            {cobrancaLink && (
+              <Button asChild variant="outline" size="sm" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
+                <a href={cobrancaLink} target="_blank" rel="noreferrer"><MessageCircle className="size-4 mr-1" />Cobrar (WhatsApp)</a>
+              </Button>
+            )}
+            {reciboLink && (
+              <Button asChild variant="outline" size="sm" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
+                <a href={reciboLink} target="_blank" rel="noreferrer"><MessageCircle className="size-4 mr-1" />Recibo (WhatsApp)</a>
               </Button>
             )}
             <Button size="sm" onClick={() => setChargeOpen(true)}><Plus className="size-4 mr-1" />Nova cobrança</Button>
