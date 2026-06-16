@@ -696,3 +696,95 @@ export const seedDemoLeads = createServerFn({ method: "POST" }).handler(async ()
   return { ok: true };
 });
 
+// ---------- BOT / ASSISTENTE ----------
+import { chargeMessage, overdueMessage, contractEndingMessage } from "@/lib/bot-templates";
+
+type BotSuggestion = {
+  key: string;
+  type: "overdue" | "due_soon" | "contract_ending" | "receipt_pending";
+  priority: number;
+  tenantId: string;
+  tenantName: string;
+  tenantPhone: string | null;
+  title: string;
+  subtitle: string;
+  message: string;
+  amount?: number;
+  dueDate?: string;
+};
+
+export const listBotSuggestions = createServerFn({ method: "GET" }).handler(async (): Promise<BotSuggestion[]> => {
+  await syncOverdue();
+  const s = await admin();
+  const todayStr = today();
+  const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const in60 = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+
+  const [{ data: payments }, { data: contracts }, { data: handled }] = await Promise.all([
+    s.from("payments")
+      .select("id, amount, due_date, status, tenant_id, tenants(id, name, phone, pix_payer, due_day, rent_amount)")
+      .neq("status", "paid").limit(2000),
+    s.from("contracts")
+      .select("id, end_date, status, tenant_id, tenants(id, name, phone)")
+      .eq("status", "active").not("end_date", "is", null).lte("end_date", in60).gte("end_date", todayStr),
+    s.from("bot_actions").select("payload, status").in("status", ["done", "dismissed"]).limit(5000),
+  ]);
+
+  const handledKeys = new Set((handled ?? []).map((h: any) => h.payload?.key).filter(Boolean));
+  const out: BotSuggestion[] = [];
+
+  (payments ?? []).forEach((p: any) => {
+    if (!p.tenants) return;
+    const due = new Date(p.due_date + "T12:00:00");
+    const [y, m] = p.due_date.split("-").map(Number);
+    const isOverdue = p.due_date < todayStr;
+    const isDueSoon = !isOverdue && p.due_date <= in7;
+    if (!isOverdue && !isDueSoon) return;
+    const key = `${isOverdue ? "overdue" : "due_soon"}:${p.id}`;
+    if (handledKeys.has(key)) return;
+    const daysLate = Math.floor((Date.now() - due.getTime()) / 86400000);
+    const message = isOverdue
+      ? overdueMessage({ name: p.tenants.name, amount: Number(p.amount), daysLate, pix: p.tenants.pix_payer })
+      : chargeMessage({ name: p.tenants.name, amount: Number(p.amount), year: y, month: m, pix: p.tenants.pix_payer, dueDay: p.tenants.due_day });
+    out.push({
+      key, type: isOverdue ? "overdue" : "due_soon",
+      priority: isOverdue ? 100 + daysLate : 50,
+      tenantId: p.tenants.id, tenantName: p.tenants.name, tenantPhone: p.tenants.phone,
+      title: isOverdue ? `Cobrar atraso de ${p.tenants.name}` : `Lembrar vencimento — ${p.tenants.name}`,
+      subtitle: isOverdue ? `${daysLate} dia(s) em atraso · ${p.due_date}` : `Vence em ${p.due_date}`,
+      message, amount: Number(p.amount), dueDate: p.due_date,
+    });
+  });
+
+  (contracts ?? []).forEach((c: any) => {
+    if (!c.tenants) return;
+    const key = `contract_ending:${c.id}`;
+    if (handledKeys.has(key)) return;
+    out.push({
+      key, type: "contract_ending", priority: 30,
+      tenantId: c.tenants.id, tenantName: c.tenants.name, tenantPhone: c.tenants.phone,
+      title: `Contrato vence em breve — ${c.tenants.name}`,
+      subtitle: `Vencimento em ${c.end_date}`,
+      message: contractEndingMessage({ name: c.tenants.name, endDate: c.end_date }),
+      dueDate: c.end_date,
+    });
+  });
+
+  return out.sort((a, b) => b.priority - a.priority);
+});
+
+export const resolveBotSuggestion = createServerFn({ method: "POST" })
+  .inputValidator((d: { key: string; tenantId?: string | null; type: string; status: "done" | "dismissed"; message?: string }) => d)
+  .handler(async ({ data }) => {
+    const s = await admin();
+    await s.from("bot_actions").insert({
+      tenant_id: data.tenantId ?? null,
+      type: data.type,
+      status: data.status,
+      message: data.message ?? null,
+      done_at: new Date().toISOString(),
+      payload: { key: data.key },
+    });
+    return { ok: true };
+  });
+

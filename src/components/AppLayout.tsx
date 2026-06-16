@@ -1,11 +1,13 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, AlertTriangle, FileText, Users, Home, FileSignature, UserMinus, Bell, Calendar, UserPlus, ClipboardList, BarChart3, MessageCircle } from "lucide-react";
+import { LayoutDashboard, Wallet, AlertTriangle, FileText, Users, Home, FileSignature, UserMinus, Bell, Calendar, UserPlus, ClipboardList, BarChart3, MessageCircle, Bot } from "lucide-react";
 import logo from "@/assets/mesquita-logo.png";
 import { cn } from "@/lib/utils";
+import { BotBell } from "@/components/BotBell";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/crm", label: "CRM / Leads", icon: UserPlus },
+  { to: "/assistente", label: "Assistente", icon: Bot },
   { to: "/agenda", label: "Agenda", icon: ClipboardList },
   { to: "/financeiro", label: "Financeiro", icon: Wallet },
   { to: "/inadimplencia", label: "Inadimplência", icon: AlertTriangle },
@@ -71,7 +73,10 @@ export function PageHeader({ title, description, actions }: { title: string; des
           <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
           {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
         </div>
-        {actions}
+        <div className="flex items-center gap-3">
+          <BotBell />
+          {actions}
+        </div>
       </div>
     </div>
   );
