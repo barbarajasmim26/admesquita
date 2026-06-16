@@ -63,9 +63,9 @@ export async function generateContractPDF(d: ContractData): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 22;
+  const margin = 25;
   const maxW = pageW - margin * 2;
-  let y = 22;
+  let y = 25;
 
   const c = { ...DEFAULTS, ...d };
 
@@ -92,7 +92,7 @@ export async function generateContractPDF(d: ContractData): Promise<Blob> {
     });
     let line: Word[] = [];
     let lineW = 0;
-    const lineH = 5.5;
+    const lineH = 6.5;
     const flush = () => {
       ensureSpace(lineH);
       let x = margin;
@@ -122,24 +122,26 @@ export async function generateContractPDF(d: ContractData): Promise<Blob> {
       lineW += w.w;
     }
     if (line.length) flush();
-    y += opts.spaceAfter ?? 3;
+    y += opts.spaceAfter ?? 4.5;
   };
 
   const title = (t: string) => {
-    ensureSpace(10);
+    ensureSpace(14);
+    y += 2;
     doc.setFont("times", "bold");
     doc.setFontSize(13);
     doc.text(t, pageW / 2, y, { align: "center" });
-    y += 9;
+    y += 11;
     doc.setFontSize(11);
   };
 
   const section = (t: string) => {
-    ensureSpace(8);
+    ensureSpace(12);
+    y += 3;
     doc.setFont("times", "bold");
     doc.setFontSize(11);
-    doc.text(t, margin, y);
-    y += 6;
+    doc.text(t, pageW / 2, y, { align: "center" });
+    y += 8;
   };
 
   title("CONTRATO DE LOCAÇÃO DE IMÓVEL RESIDENCIAL URBANO");
