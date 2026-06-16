@@ -12,11 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as RecibosRouteImport } from './routes/recibos'
-import { Route as InquilinosRouteImport } from './routes/inquilinos'
 import { Route as InadimplenciaRouteImport } from './routes/inadimplencia'
 import { Route as ImoveisRouteImport } from './routes/imoveis'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
-import { Route as ExInquilinosRouteImport } from './routes/ex-inquilinos'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as ContratosRouteImport } from './routes/contratos'
 import { Route as CalendarioRouteImport } from './routes/calendario'
@@ -24,6 +22,8 @@ import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InquilinosIndexRouteImport } from './routes/inquilinos.index'
+import { Route as ExInquilinosIndexRouteImport } from './routes/ex-inquilinos.index'
 import { Route as InquilinosIdRouteImport } from './routes/inquilinos.$id'
 import { Route as ImoveisIdRouteImport } from './routes/imoveis.$id'
 import { Route as ExInquilinosIdRouteImport } from './routes/ex-inquilinos.$id'
@@ -43,11 +43,6 @@ const RecibosRoute = RecibosRouteImport.update({
   path: '/recibos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InquilinosRoute = InquilinosRouteImport.update({
-  id: '/inquilinos',
-  path: '/inquilinos',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const InadimplenciaRoute = InadimplenciaRouteImport.update({
   id: '/inadimplencia',
   path: '/inadimplencia',
@@ -61,11 +56,6 @@ const ImoveisRoute = ImoveisRouteImport.update({
 const FinanceiroRoute = FinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExInquilinosRoute = ExInquilinosRouteImport.update({
-  id: '/ex-inquilinos',
-  path: '/ex-inquilinos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CrmRoute = CrmRouteImport.update({
@@ -103,10 +93,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InquilinosIndexRoute = InquilinosIndexRouteImport.update({
+  id: '/inquilinos/',
+  path: '/inquilinos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExInquilinosIndexRoute = ExInquilinosIndexRouteImport.update({
+  id: '/ex-inquilinos/',
+  path: '/ex-inquilinos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InquilinosIdRoute = InquilinosIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => InquilinosRoute,
+  id: '/inquilinos/$id',
+  path: '/inquilinos/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ImoveisIdRoute = ImoveisIdRouteImport.update({
   id: '/$id',
@@ -114,9 +114,9 @@ const ImoveisIdRoute = ImoveisIdRouteImport.update({
   getParentRoute: () => ImoveisRoute,
 } as any)
 const ExInquilinosIdRoute = ExInquilinosIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ExInquilinosRoute,
+  id: '/ex-inquilinos/$id',
+  path: '/ex-inquilinos/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -127,17 +127,17 @@ export interface FileRoutesByFullPath {
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
-  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
-  '/inquilinos': typeof InquilinosRouteWithChildren
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
   '/whatsapp': typeof WhatsappRoute
   '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
   '/imoveis/$id': typeof ImoveisIdRoute
   '/inquilinos/$id': typeof InquilinosIdRoute
+  '/ex-inquilinos/': typeof ExInquilinosIndexRoute
+  '/inquilinos/': typeof InquilinosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,17 +147,17 @@ export interface FileRoutesByTo {
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
-  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
-  '/inquilinos': typeof InquilinosRouteWithChildren
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
   '/whatsapp': typeof WhatsappRoute
   '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
   '/imoveis/$id': typeof ImoveisIdRoute
   '/inquilinos/$id': typeof InquilinosIdRoute
+  '/ex-inquilinos': typeof ExInquilinosIndexRoute
+  '/inquilinos': typeof InquilinosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -168,17 +168,17 @@ export interface FileRoutesById {
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
-  '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
-  '/inquilinos': typeof InquilinosRouteWithChildren
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
   '/whatsapp': typeof WhatsappRoute
   '/ex-inquilinos/$id': typeof ExInquilinosIdRoute
   '/imoveis/$id': typeof ImoveisIdRoute
   '/inquilinos/$id': typeof InquilinosIdRoute
+  '/ex-inquilinos/': typeof ExInquilinosIndexRoute
+  '/inquilinos/': typeof InquilinosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -190,17 +190,17 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/contratos'
     | '/crm'
-    | '/ex-inquilinos'
     | '/financeiro'
     | '/imoveis'
     | '/inadimplencia'
-    | '/inquilinos'
     | '/recibos'
     | '/relatorios'
     | '/whatsapp'
     | '/ex-inquilinos/$id'
     | '/imoveis/$id'
     | '/inquilinos/$id'
+    | '/ex-inquilinos/'
+    | '/inquilinos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -210,17 +210,17 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/contratos'
     | '/crm'
-    | '/ex-inquilinos'
     | '/financeiro'
     | '/imoveis'
     | '/inadimplencia'
-    | '/inquilinos'
     | '/recibos'
     | '/relatorios'
     | '/whatsapp'
     | '/ex-inquilinos/$id'
     | '/imoveis/$id'
     | '/inquilinos/$id'
+    | '/ex-inquilinos'
+    | '/inquilinos'
   id:
     | '__root__'
     | '/'
@@ -230,17 +230,17 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/contratos'
     | '/crm'
-    | '/ex-inquilinos'
     | '/financeiro'
     | '/imoveis'
     | '/inadimplencia'
-    | '/inquilinos'
     | '/recibos'
     | '/relatorios'
     | '/whatsapp'
     | '/ex-inquilinos/$id'
     | '/imoveis/$id'
     | '/inquilinos/$id'
+    | '/ex-inquilinos/'
+    | '/inquilinos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -251,14 +251,16 @@ export interface RootRouteChildren {
   CalendarioRoute: typeof CalendarioRoute
   ContratosRoute: typeof ContratosRoute
   CrmRoute: typeof CrmRoute
-  ExInquilinosRoute: typeof ExInquilinosRouteWithChildren
   FinanceiroRoute: typeof FinanceiroRoute
   ImoveisRoute: typeof ImoveisRouteWithChildren
   InadimplenciaRoute: typeof InadimplenciaRoute
-  InquilinosRoute: typeof InquilinosRouteWithChildren
   RecibosRoute: typeof RecibosRoute
   RelatoriosRoute: typeof RelatoriosRoute
   WhatsappRoute: typeof WhatsappRoute
+  ExInquilinosIdRoute: typeof ExInquilinosIdRoute
+  InquilinosIdRoute: typeof InquilinosIdRoute
+  ExInquilinosIndexRoute: typeof ExInquilinosIndexRoute
+  InquilinosIndexRoute: typeof InquilinosIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -284,13 +286,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecibosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inquilinos': {
-      id: '/inquilinos'
-      path: '/inquilinos'
-      fullPath: '/inquilinos'
-      preLoaderRoute: typeof InquilinosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/inadimplencia': {
       id: '/inadimplencia'
       path: '/inadimplencia'
@@ -310,13 +305,6 @@ declare module '@tanstack/react-router' {
       path: '/financeiro'
       fullPath: '/financeiro'
       preLoaderRoute: typeof FinanceiroRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ex-inquilinos': {
-      id: '/ex-inquilinos'
-      path: '/ex-inquilinos'
-      fullPath: '/ex-inquilinos'
-      preLoaderRoute: typeof ExInquilinosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/crm': {
@@ -368,12 +356,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inquilinos/': {
+      id: '/inquilinos/'
+      path: '/inquilinos'
+      fullPath: '/inquilinos/'
+      preLoaderRoute: typeof InquilinosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ex-inquilinos/': {
+      id: '/ex-inquilinos/'
+      path: '/ex-inquilinos'
+      fullPath: '/ex-inquilinos/'
+      preLoaderRoute: typeof ExInquilinosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inquilinos/$id': {
       id: '/inquilinos/$id'
-      path: '/$id'
+      path: '/inquilinos/$id'
       fullPath: '/inquilinos/$id'
       preLoaderRoute: typeof InquilinosIdRouteImport
-      parentRoute: typeof InquilinosRoute
+      parentRoute: typeof rootRouteImport
     }
     '/imoveis/$id': {
       id: '/imoveis/$id'
@@ -384,25 +386,13 @@ declare module '@tanstack/react-router' {
     }
     '/ex-inquilinos/$id': {
       id: '/ex-inquilinos/$id'
-      path: '/$id'
+      path: '/ex-inquilinos/$id'
       fullPath: '/ex-inquilinos/$id'
       preLoaderRoute: typeof ExInquilinosIdRouteImport
-      parentRoute: typeof ExInquilinosRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface ExInquilinosRouteChildren {
-  ExInquilinosIdRoute: typeof ExInquilinosIdRoute
-}
-
-const ExInquilinosRouteChildren: ExInquilinosRouteChildren = {
-  ExInquilinosIdRoute: ExInquilinosIdRoute,
-}
-
-const ExInquilinosRouteWithChildren = ExInquilinosRoute._addFileChildren(
-  ExInquilinosRouteChildren,
-)
 
 interface ImoveisRouteChildren {
   ImoveisIdRoute: typeof ImoveisIdRoute
@@ -415,18 +405,6 @@ const ImoveisRouteChildren: ImoveisRouteChildren = {
 const ImoveisRouteWithChildren =
   ImoveisRoute._addFileChildren(ImoveisRouteChildren)
 
-interface InquilinosRouteChildren {
-  InquilinosIdRoute: typeof InquilinosIdRoute
-}
-
-const InquilinosRouteChildren: InquilinosRouteChildren = {
-  InquilinosIdRoute: InquilinosIdRoute,
-}
-
-const InquilinosRouteWithChildren = InquilinosRoute._addFileChildren(
-  InquilinosRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
@@ -435,14 +413,16 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarioRoute: CalendarioRoute,
   ContratosRoute: ContratosRoute,
   CrmRoute: CrmRoute,
-  ExInquilinosRoute: ExInquilinosRouteWithChildren,
   FinanceiroRoute: FinanceiroRoute,
   ImoveisRoute: ImoveisRouteWithChildren,
   InadimplenciaRoute: InadimplenciaRoute,
-  InquilinosRoute: InquilinosRouteWithChildren,
   RecibosRoute: RecibosRoute,
   RelatoriosRoute: RelatoriosRoute,
   WhatsappRoute: WhatsappRoute,
+  ExInquilinosIdRoute: ExInquilinosIdRoute,
+  InquilinosIdRoute: InquilinosIdRoute,
+  ExInquilinosIndexRoute: ExInquilinosIndexRoute,
+  InquilinosIndexRoute: InquilinosIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -13,7 +13,7 @@ import { brl, formatDateBR } from "@/lib/finance";
 
 const opts = queryOptions({ queryKey: ["former"], queryFn: () => listFormerTenants() });
 
-export const Route = createFileRoute("/ex-inquilinos")({
+export const Route = createFileRoute("/ex-inquilinos/")({
   head: () => ({ meta: [{ title: "Ex-inquilinos — Mesquita Imóveis" }] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(opts),
   errorComponent: ({ error }) => <div className="p-8">{String(error)}</div>,
