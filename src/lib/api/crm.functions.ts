@@ -202,10 +202,11 @@ export const setMonthStatus = createServerFn({ method: "POST" })
     let paymentId = existing?.id;
     if (!paymentId) {
       const { data: ct } = await s.from("contracts").select("id").eq("tenant_id", data.tenantId).eq("status", "active").limit(1).maybeSingle();
+      if (!ct) throw new Error("Contrato ativo não encontrado");
       const dueDay = Math.min(Number(t.due_day ?? 10), lastDay);
       const dueDate = `${data.year}-${mm}-${String(dueDay).padStart(2, "0")}`;
       const { data: row, error } = await s.from("payments").insert({
-        tenant_id: data.tenantId, contract_id: ct?.id ?? null,
+        tenant_id: data.tenantId, contract_id: ct.id,
         amount: Number(t.rent_amount ?? 0), due_date: dueDate, status: "pending",
       }).select("id").single();
       if (error) throw error;
