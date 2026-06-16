@@ -174,21 +174,21 @@ export async function generateContractPDF(d: ContractData): Promise<Blob> {
   writeTokens([{ text: "Parágrafo terceiro.", bold: true }, { text: " Haverá ainda a retomada do imóvel, caso haja descumprimento contratual por parte do LOCATÁRIO; ou ainda, caso ocorra qualquer uma das circunstâncias previstas no Art. 47 da Lei Federal n° 8.245, de 18 de outubro de 1991 (Lei do Inquilinato)." }]);
 
   writeTokens([
-    { text: "CLÁUSULA 3ª", bold: true },
+    { text: "CLAUSULA 3ª", bold: true },
     { text: ` - O valor inicial do caução de ${brl(d.depositAmount).replace("R$ ", "")} (${brlExtenso(d.depositAmount)}) e do aluguel é de ${brl(d.rentAmount)} (${brlExtenso(d.rentAmount)}) mensais, o qual deve ser pago impreterivelmente até o dia ${d.dueDay} de cada mês subsequente ao vencido, via boleto, transferência bancária, PIX, ou por outro meio que venha a ser acordado com o LOCADOR.` },
   ]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: ` O aluguel será reajustado anualmente de acordo com a variação do ${c.readjustmentIndex} dos meses anteriores; e na sua falta, por outro índice que venha a substitui-lo.` }]);
 
-  writeTokens([{ text: "CLÁUSULA 4ª", bold: true }, { text: " - O LOCATÁRIO deve pagar ao LOCADOR, no início da locação, uma caução em dinheiro no valor designado na Cláusula 3ª." }]);
+  writeTokens([{ text: "CLAUSULA 4ª", bold: true }, { text: " - O LOCATÁRIO deve pagar ao LOCADOR, no início da locação, uma caução em dinheiro no valor designado na Cláusula 3ª." }]);
 
   section("DIRETOS, OBRIGAÇÕES DAS PARTES E CLÁUSULAS PENAIS");
-  writeTokens([{ text: "CLÁUSULA 5ª", bold: true }, { text: " - O LOCADOR deve entregar o imóvel em bom estado de conservação a servir ao uso a que se destina, permitindo ao LOCATÁRIO a utilização pacífica do imóvel locado." }]);
+  writeTokens([{ text: "CLAUSULA 5ª", bold: true }, { text: " - O LOCADOR deve entregar o imóvel em bom estado de conservação a servir ao uso a que se destina, permitindo ao LOCATÁRIO a utilização pacífica do imóvel locado." }]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: " O LOCATÁRIO declara receber o imóvel em perfeito estado de conservação e de funcionamento." }]);
   writeTokens([{ text: "CLÁUSULA 6ª", bold: true }, { text: " - O LOCATÁRIO declara, que o imóvel ora locado, destina-se única, exclusivamente para o seu uso residencial e de sua família. E desde logo, se obriga a servir-se do prédio para o uso convencionado, devendo tratá-lo com o mesmo cuidado como se fosse seu." }]);
   writeTokens([{ text: "CLÁUSULA 7ª", bold: true }, { text: " - O LOCATÁRIO se responsabiliza pela conservação e limpeza do imóvel, e deverá para tanto, realizar a imediata reparação dos danos verificados nas suas instalações; mesmo que estas não tenham sido provocadas por si, mas por seus dependentes, familiares, visitantes ou prepostos." }]);
   writeTokens([{ text: "CLÁUSULA 8ª", bold: true }, { text: " - O LOCATÁRIO não poderá sublocar, transferir ou ceder o imóvel, sendo nulo de pleno direito qualquer ato praticado com este fim sem o consentimento prévio e por escrito do LOCADOR." }]);
-  writeTokens([{ text: "CLÁUSULA 9ª", bold: true }, { text: " - O LOCATÁRIO está obrigado a devolver o imóvel em perfeitas condições de limpeza, conservação e pintura, quando finda ou rescindida esta locação." }]);
-  writeTokens([{ text: "CLÁUSULA 10ª", bold: true }, { text: " - O LOCATÁRIO não poderá realizar obras que alterem ou modifiquem a estrutura do imóvel locado, sem prévia autorização por escrito do LOCADOR." }]);
+  writeTokens([{ text: "CLAUSULA 9ª", bold: true }, { text: " - O LOCATÁRIO está obrigado a devolver o imóvel em perfeitas condições de limpeza, conservação e pintura, quando finda ou rescindida esta locação." }]);
+  writeTokens([{ text: "CLAUSULA 10ª", bold: true }, { text: " - O LOCATÁRIO não poderá realizar obras que alterem ou modifiquem a estrutura do imóvel locado, sem prévia autorização por escrito do LOCADOR." }]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: " Caso este consinta na realização das obras, estas ficarão desde logo, incorporadas ao imóvel, sem que assista ao LOCATÁRIO qualquer indenização pelas obras ou retenção por benfeitorias." }]);
   writeTokens([{ text: "CLÁUSULA 11ª", bold: true }, { text: " - Caso o LOCATÁRIO não conserve o imóvel, realize demolições ou outras práticas que venham a afetar a segurança do prédio, fica estipulada multa compensatória no valor de 10 (dez) alugueis vigentes a data do fato." }]);
   writeTokens([{ text: "Parágrafo único.", bold: true }, { text: " Por ventura os danos causados superem o valor da multa prevista no caput, deverá o LOCATÁRIO pagar todas as despesas necessárias ao reparo do imóvel até o limite da danificação." }]);

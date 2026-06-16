@@ -52,4 +52,4 @@ export const todayLongPt = () => {
   const d = new Date();
   return `${d.getDate()} de ${monthName(d.getMonth() + 1)} de ${d.getFullYear()}`;
 };
-export const longPt = (d: Date) => `${d.getDate()} de ${monthName(d.getMonth() + 1)} de ${d.getFullYear()}`;
+export const longPt = (d: Date) => `${String(d.getDate()).padStart(2, "0")} de ${monthName(d.getMonth() + 1)} de ${d.getFullYear()}`;
