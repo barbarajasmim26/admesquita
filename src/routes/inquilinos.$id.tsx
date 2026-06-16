@@ -15,6 +15,7 @@ import { PayDialog, emitReceiptFromPayment } from "@/components/PayDialog";
 import { EndTenancyDialog } from "@/components/EndTenancyDialog";
 import { downloadContract } from "@/lib/contract-pdf";
 import { toast } from "sonner";
+import { MonthlyPaymentGrid } from "@/components/MonthlyPaymentGrid";
 
 const opts = (id: string) => queryOptions({ queryKey: ["tenant", id], queryFn: () => getTenant({ data: { id } }) });
 
@@ -109,6 +110,14 @@ function Page() {
 
         <Card>
           <CardHeader><CardTitle>Histórico de pagamentos ({data.payments.length})</CardTitle></CardHeader>
+          <CardContent className="pt-0">
+            <MonthlyPaymentGrid
+              tenantId={t.id}
+              rentAmount={Number(t.rent_amount ?? 0)}
+              startDate={t.start_date}
+              payments={data.payments as any}
+            />
+          </CardContent>
           <Table>
             <TableHeader>
               <TableRow>
