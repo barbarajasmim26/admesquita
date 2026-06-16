@@ -22,6 +22,7 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
     return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
   });
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
+  const [pixPayer, setPixPayer] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -32,11 +33,17 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
     } else {
       setPropertyId(""); setTenantId(""); setAmount("");
     }
+    setPixPayer(prefill?.pixPayer ?? "");
   }, [open, prefill]);
 
   const property: any = (props ?? []).find((p: any) => p.id === propertyId);
   const tenants: any[] = property?.tenants ?? [];
   const tenant: any = tenants.find((t: any) => t.id === tenantId);
+
+  useEffect(() => {
+    if (tenant && !pixPayer) setPixPayer(tenant.pix_payer ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   async function submit() {
     if (!tenant || !amount) { toast.error("Selecione inquilino e valor"); return; }
@@ -53,7 +60,7 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
         referenceMonth: mm,
         referenceYear: yyyy,
         issueDate: new Date(issueDate + "T12:00:00"),
-        pixPayer: tenant.pix_payer ?? null,
+        pixPayer: pixPayer.trim() || null,
       }, `recibo_${tenant.name.replace(/\s+/g, "_")}_${mm}_${yyyy}.pdf`);
       const r: any = await issue({ data: { tenantId: tenant.id, amount: val, referenceMonth: refMonth } });
       toast.success(`Recibo ${r.number} emitido!`);
@@ -102,6 +109,17 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
               <Label>Data emissão</Label>
               <Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} />
             </div>
+          </div>
+          <div>
+            <Label>Pago via pix por (opcional)</Label>
+            <Input
+              value={pixPayer}
+              onChange={e => setPixPayer(e.target.value)}
+              placeholder="Nome de quem efetuou o pix (deixe em branco para apenas 'via pix')"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Aparecerá no recibo como: "via pix por {pixPayer || "—"}"
+            </p>
           </div>
         </div>
         <DialogFooter>
