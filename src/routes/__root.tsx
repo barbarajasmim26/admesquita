@@ -84,11 +84,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
       { name: "robots", content: "noindex,nofollow" },
       { property: "og:title", content: "Mesquita Imóveis — Gestão" },
-      { property: "og:description", content: "Sistema interno de gestão de imóveis e inquilinos." },
+      { property: "og:description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Mesquita Imóveis — Gestão" },
-      { name: "twitter:description", content: "Sistema interno de gestão de imóveis e inquilinos." },
+      { name: "twitter:description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/400d0fb0-37c9-41f7-b6fe-e9f30b9ae71d/id-preview-d794f95a--6c86a4e8-0587-4039-8fd4-7a31fc849f89.lovable.app-1781645020582.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/400d0fb0-37c9-41f7-b6fe-e9f30b9ae71d/id-preview-d794f95a--6c86a4e8-0587-4039-8fd4-7a31fc849f89.lovable.app-1781645020582.png" },
     ],
     links: [
       {
