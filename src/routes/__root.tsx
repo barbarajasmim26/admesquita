@@ -4,15 +4,11 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { AccessGate } from "@/components/AccessGate";
-
-import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
@@ -76,48 +72,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Mesquita Imóveis — Gestão" },
-      { name: "description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
-      { name: "robots", content: "noindex,nofollow" },
-      { property: "og:title", content: "Mesquita Imóveis — Gestão" },
-      { property: "og:description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Mesquita Imóveis — Gestão" },
-      { name: "twitter:description", content: "Sistema interno de gestão de imóveis, inquilinos, contratos, pagamentos e CRM da Mesquita Administração de Imóveis." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/400d0fb0-37c9-41f7-b6fe-e9f30b9ae71d/id-preview-d794f95a--6c86a4e8-0587-4039-8fd4-7a31fc849f89.lovable.app-1781645020582.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/400d0fb0-37c9-41f7-b6fe-e9f30b9ae71d/id-preview-d794f95a--6c86a4e8-0587-4039-8fd4-7a31fc849f89.lovable.app-1781645020582.png" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();

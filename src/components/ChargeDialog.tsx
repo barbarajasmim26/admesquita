@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/rpc";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { createCharge, listTenants } from "@/lib/api/crm.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";

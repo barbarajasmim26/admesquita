@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/rpc";
 import { useQueryClient } from "@tanstack/react-query";
 import { registerPayment, getPaymentForReceipt } from "@/lib/api/crm.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";

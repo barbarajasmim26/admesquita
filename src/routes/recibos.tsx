@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/rpc";
 import { useState } from "react";
 import { listPayments, getPaymentForReceipt, getAnyPaymentForReceipt, listReceipts, registerReceipt } from "@/lib/api/crm.functions";
 import { PageHeader } from "@/components/AppLayout";

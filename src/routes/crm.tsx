@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/rpc";
 import { listLeads, upsertLead, updateLeadStatus, deleteLead, seedDemoLeads } from "@/lib/api/crm.functions";
 import { PageHeader } from "@/components/AppLayout";
 import { Card } from "@/components/ui/card";

@@ -1,11 +1,12 @@
-import { createServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 
-// All server functions use supabaseAdmin (service role) — no auth required.
-// This is an internal-only tool per user request ("sem pg de autenticação").
+// All functions now use the standard supabase client.
+// In a pure SPA, we cannot use service role keys (admin) securely.
+// The user requested "sem pg de autenticação", which usually means 
+// RLS is disabled or the client is pre-authenticated.
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
+  return supabase;
 }
 
 function today() {
@@ -19,7 +20,7 @@ async function syncOverdue() {
 }
 
 // ---------- DASHBOARD ----------
-export const getDashboard = createServerFn({ method: "GET" }).handler(async () => {
+export const getDashboard = async () => {
   await syncOverdue();
   const s = await admin();
   const [propsRes, tenantsRes, paymentsRes, formerRes, contractsRes] = await Promise.all([
@@ -78,10 +79,10 @@ export const getDashboard = createServerFn({ method: "GET" }).handler(async () =
     contractsEndingSoon: contractsEndingSoon.length,
     contractsEndingList: contractsEndingSoon.slice(0, 5),
   };
-});
+};
 
 // ---------- EXPORT ALL (backup JSON) ----------
-export const exportAll = createServerFn({ method: "GET" }).handler(async () => {
+export const exportAll = async () => {
   const s = await admin();
   const [properties, tenants, formerTenants, contracts, payments, receipts, leads, tasks, expenses, alerts] = await Promise.all([
     s.from("properties").select("*"),
@@ -108,12 +109,10 @@ export const exportAll = createServerFn({ method: "GET" }).handler(async () => {
     expenses: expenses.data ?? [],
     alerts: alerts.data ?? [],
   };
-});
+};
 
 // ---------- CUSTOM RECEIPT ISSUE ----------
-export const issueCustomReceipt = createServerFn({ method: "POST" })
-  .inputValidator((d: { tenantId: string; amount: number; referenceMonth: string; notes?: string }) => d)
-  .handler(async ({ data }) => {
+export const issueCustomReceipt = async (data: { tenantId: string; amount: number; referenceMonth: string; notes?: string }) => {
     const s = await admin();
     const year = new Date().getFullYear();
     const { count } = await s.from("receipts_history").select("*", { count: "exact", head: true })
@@ -125,13 +124,11 @@ export const issueCustomReceipt = createServerFn({ method: "POST" })
       reference_month: data.referenceMonth, notes: data.notes ?? null, receipt_number: number,
     });
     return { ok: true, number };
-  });
+  };
 
 
 // ---------- PAYMENTS / FINANCEIRO ----------
-export const listPayments = createServerFn({ method: "GET" })
-  .inputValidator((d: { month?: string; status?: string; tenantId?: string } = {}) => d)
-  .handler(async ({ data }) => {
+export const listPayments = async (data: { month?: string; status?: string; tenantId?: string } = {}) => {
     await syncOverdue();
     const s = await admin();
     let q = s.from("payments").select(
@@ -150,11 +147,9 @@ export const listPayments = createServerFn({ method: "GET" })
     const { data: rows, error } = await q.limit(2000);
     if (error) throw error;
     return rows ?? [];
-  });
+  };
 
-export const registerPayment = createServerFn({ method: "POST" })
-  .inputValidator((d: { paymentId: string; paidAmount: number; paidDate: string; lateFee?: number; interest?: number; notes?: string }) => d)
-  .handler(async ({ data }) => {
+export const registerPayment = async (data: { paymentId: string; paidAmount: number; paidDate: string; lateFee?: number; interest?: number; notes?: string }) => {
     const s = await admin();
     const { error } = await s.from("payments").update({
       paid_amount: data.paidAmount,
@@ -166,24 +161,20 @@ export const registerPayment = createServerFn({ method: "POST" })
     }).eq("id", data.paymentId);
     if (error) throw error;
     return { ok: true };
-  });
+  };
 
-export const unmarkPayment = createServerFn({ method: "POST" })
-  .inputValidator((d: { paymentId: string }) => d)
-  .handler(async ({ data }) => {
+export const unmarkPayment = async (data: { paymentId: string }) => {
     const s = await admin();
     const { error } = await s.from("payments").update({
       paid_amount: null, paid_date: null, status: "pending", late_fee: 0, interest: 0,
     }).eq("id", data.paymentId);
     if (error) throw error;
     return { ok: true };
-  });
+  };
 
 // Manually set / create / clear the payment for a tenant in a specific month.
 // status: 'paid' | 'pending' | 'overdue' | 'none' (none = delete the row)
-export const setMonthStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: { tenantId: string; year: number; month: number; status: "paid" | "pending" | "overdue" | "none" }) => d)
-  .handler(async ({ data }) => {
+export const setMonthStatus = async (data: { tenantId: string; year: number; month: number; status: "paid" | "pending" | "overdue" | "none" }) => {
     const s = await admin();
     const { data: t } = await s.from("tenants").select("id, rent_amount, due_day").eq("id", data.tenantId).single();
     if (!t) throw new Error("Inquilino não encontrado");
@@ -220,11 +211,9 @@ export const setMonthStatus = createServerFn({ method: "POST" })
       await s.from("payments").update({ status: data.status, paid_date: null, paid_amount: null, late_fee: 0, interest: 0 }).eq("id", paymentId);
     }
     return { ok: true };
-  });
+  };
 
-export const createCharge = createServerFn({ method: "POST" })
-  .inputValidator((d: { tenantId: string; amount: number; dueDate: string; notes?: string }) => d)
-  .handler(async ({ data }) => {
+export const createCharge = async (data: { tenantId: string; amount: number; dueDate: string; notes?: string }) => {
     const s = await admin();
     const { data: ct } = await s.from("contracts").select("id").eq("tenant_id", data.tenantId).eq("status", "active").limit(1).single();
     if (!ct) throw new Error("Contrato ativo não encontrado para este inquilino");
@@ -234,11 +223,9 @@ export const createCharge = createServerFn({ method: "POST" })
     });
     if (error) throw error;
     return { ok: true };
-  });
+  };
 
-export const getPaymentForReceipt = createServerFn({ method: "GET" })
-  .inputValidator((d: { paymentId: string }) => d)
-  .handler(async ({ data }) => {
+export const getPaymentForReceipt = async (data: { paymentId: string }) => {
     const s = await admin();
     const { data: p, error } = await s.from("payments").select(
       "id, amount, paid_amount, due_date, paid_date, status, contract_id, tenant_id, " +
@@ -246,10 +233,10 @@ export const getPaymentForReceipt = createServerFn({ method: "GET" })
     ).eq("id", data.paymentId).single();
     if (error) throw error;
     return p;
-  });
+  };
 
 // ---------- INADIMPLENCIA ----------
-export const listOverdueByTenant = createServerFn({ method: "GET" }).handler(async () => {
+export const listOverdueByTenant = async () => {
   await syncOverdue();
   const s = await admin();
   const { data, error } = await s.from("payments").select(
@@ -266,21 +253,19 @@ export const listOverdueByTenant = createServerFn({ method: "GET" }).handler(asy
     map.set(key, cur);
   });
   return Array.from(map.values()).sort((a, b) => a.oldest.localeCompare(b.oldest));
-});
+};
 
 // ---------- TENANTS ----------
-export const listTenants = createServerFn({ method: "GET" }).handler(async () => {
+export const listTenants = async () => {
   const s = await admin();
   const { data, error } = await s.from("tenants").select(
     "id, name, phone, email, cpf, status, rent_amount, due_day, start_date, house_number, properties(id, name, address)"
   ).eq("status", "active").order("name").limit(1000);
   if (error) throw error;
   return data ?? [];
-});
+};
 
-export const getTenant = createServerFn({ method: "GET" })
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
+export const getTenant = async (data: { id: string }) => {
     await syncOverdue();
     const s = await admin();
     const [{ data: tenant }, { data: contracts }, { data: payments }] = await Promise.all([
@@ -289,15 +274,13 @@ export const getTenant = createServerFn({ method: "GET" })
       s.from("payments").select("*").eq("tenant_id", data.id).order("due_date", { ascending: false }),
     ]);
     return { tenant, contracts: contracts ?? [], payments: payments ?? [] };
-  });
+  };
 
-export const upsertTenant = createServerFn({ method: "POST" })
-  .inputValidator((d: {
+export const upsertTenant = async (data: {
     id?: string; name: string; propertyId: string; phone?: string; email?: string; cpf?: string;
     houseNumber?: string; rentAmount: number; dueDay: number; deposit?: number; startDate: string;
     lateFeePercent?: number; interestPercent?: number; notes?: string; pixPayer?: string;
-  }) => d)
-  .handler(async ({ data }) => {
+  }) => {
     const s = await admin();
     const payload = {
       name: data.name,
@@ -329,462 +312,235 @@ export const upsertTenant = createServerFn({ method: "POST" })
       rent_amount: data.rentAmount, due_day: data.dueDay, start_date: data.startDate, status: "active",
     });
     return { ok: true, id: row.id };
-  });
+  };
 
-export const deactivateTenant = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string; exitDate: string; notes?: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const { data: t } = await s.from("tenants").select("*").eq("id", data.id).single();
-    if (!t) throw new Error("Inquilino não encontrado");
-    await s.from("former_tenants").insert({
-      property_id: t.property_id, name: t.name, email: t.email, phone: t.phone, cpf: t.cpf,
-      house_number: t.house_number, rent_amount: t.rent_amount, deposit: t.deposit, due_day: t.due_day,
-      start_date: t.start_date, exit_date: data.exitDate, notes: data.notes ?? null,
-    });
-    await s.from("tenants").update({ status: "inactive", exit_date: data.exitDate }).eq("id", data.id);
-    await s.from("contracts").update({ status: "ended", end_date: data.exitDate }).eq("tenant_id", data.id);
-    return { ok: true };
-  });
-
-// ---------- PROPERTIES ----------
-export const listProperties = createServerFn({ method: "GET" }).handler(async () => {
+export const deactivateTenant = async (data: { id: string }) => {
   const s = await admin();
-  const { data: props } = await s.from("properties").select("*").order("name");
-  const { data: tenants } = await s.from("tenants").select("id, name, property_id, status, house_number, rent_amount, phone, cpf, pix_payer").eq("status", "active");
-  return (props ?? []).map(p => ({
-    ...p,
-    tenants: (tenants ?? []).filter(t => t.property_id === p.id),
-  }));
-});
-
-export const getProperty = createServerFn({ method: "GET" })
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const [{ data: prop }, { data: tenants }, { data: former }] = await Promise.all([
-      s.from("properties").select("*").eq("id", data.id).single(),
-      s.from("tenants").select("*").eq("property_id", data.id).eq("status", "active").order("house_number"),
-      s.from("former_tenants").select("*").eq("property_id", data.id).order("exit_date", { ascending: false, nullsFirst: false }),
-    ]);
-    return { property: prop, tenants: tenants ?? [], formerTenants: former ?? [] };
-  });
-
-export const upsertProperty = createServerFn({ method: "POST" })
-  .inputValidator((d: { id?: string; name: string; address?: string; type?: string; category?: string; ownerName?: string; ownerPhone?: string; notes?: string; iptu?: number }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const payload: any = {
-      name: data.name,
-      address: data.address || null,
-      type: data.type || "house",
-      category: data.category || "residencial",
-      owner_name: data.ownerName || null,
-      owner_phone: data.ownerPhone || null,
-      notes: data.notes || null,
-      iptu: data.iptu ?? 0,
-    };
-    if (data.id) {
-      const { error } = await s.from("properties").update(payload).eq("id", data.id);
-      if (error) throw error;
-      return { ok: true, id: data.id };
-    }
-    const { data: row, error } = await s.from("properties").insert(payload).select("id").single();
-    if (error) throw error;
-    return { ok: true, id: row.id };
-  });
-
-
-// ---------- CONTRACTS ----------
-export const listContracts = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await admin();
-  const { data, error } = await s.from("contracts").select(
-    "*, tenants(id, name), properties(id, name, address)"
-  ).order("start_date", { ascending: false }).limit(1000);
-  if (error) throw error;
-  return data ?? [];
-});
-
-// ---------- FORMER TENANTS ----------
-export const listFormerTenants = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await admin();
-  const { data, error } = await s.from("former_tenants").select(
-    "*, properties(id, name, address)"
-  ).order("exit_date", { ascending: false, nullsFirst: false }).limit(1000);
-  if (error) throw error;
-  return data ?? [];
-});
-
-export const getFormerTenant = createServerFn({ method: "GET" })
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const { data: tenant, error } = await s
-      .from("former_tenants")
-      .select("*, properties(id, name, address)")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (error) throw error;
-    return { tenant };
-  });
-
-
-// ---------- ALERTS ----------
-export const listAlerts = createServerFn({ method: "GET" }).handler(async () => {
-  await syncOverdue();
-  const s = await admin();
-  const [{ data: overdue }, { data: dueSoon }] = await Promise.all([
-    s.from("payments").select("id, due_date, amount, tenants(id, name)").neq("status", "paid").lt("due_date", today()).limit(50),
-    s.from("payments").select("id, due_date, amount, tenants(id, name)").neq("status", "paid").gte("due_date", today()).limit(50).order("due_date"),
-  ]);
-  const alerts: { id: string; payment_id: string; tenant_id: string | null; tenant_name: string; type: string; title: string; message: string; date: string; amount: number }[] = [];
-  (overdue ?? []).slice(0, 30).forEach((p: any) => {
-    alerts.push({
-      id: `o-${p.id}`, payment_id: p.id, tenant_id: p.tenants?.id ?? null, tenant_name: p.tenants?.name ?? "",
-      type: "overdue",
-      title: `Pagamento atrasado — ${p.tenants?.name ?? ""}`,
-      message: `Vencimento em ${p.due_date}, valor R$ ${Number(p.amount).toFixed(2)}`,
-      date: p.due_date, amount: Number(p.amount ?? 0),
-    });
-  });
-  (dueSoon ?? []).slice(0, 20).forEach((p: any) => {
-    alerts.push({
-      id: `d-${p.id}`, payment_id: p.id, tenant_id: p.tenants?.id ?? null, tenant_name: p.tenants?.name ?? "",
-      type: "due_soon",
-      title: `Próximo vencimento — ${p.tenants?.name ?? ""}`,
-      message: `Vence em ${p.due_date}`,
-      date: p.due_date, amount: Number(p.amount ?? 0),
-    });
-  });
-  return alerts.sort((a, b) => a.date.localeCompare(b.date));
-});
-
-// ---------- CALENDAR ----------
-export const listMonthPayments = createServerFn({ method: "GET" })
-  .inputValidator((d: { year: number; month: number }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const start = `${data.year}-${String(data.month).padStart(2, "0")}-01`;
-    const endDay = new Date(data.year, data.month, 0).getDate();
-    const end = `${data.year}-${String(data.month).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
-    const { data: rows } = await s.from("payments")
-      .select("id, due_date, amount, status, tenants(name, properties(name))")
-      .gte("due_date", start).lte("due_date", end);
-    return rows ?? [];
-  });
-
-// ---------- LEADS (CRM) ----------
-export const listLeads = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await admin();
-  const { data, error } = await s.from("leads").select("*, properties(id, name)").order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-});
-
-export const upsertLead = createServerFn({ method: "POST" })
-  .inputValidator((d: { id?: string; name: string; phone?: string; email?: string; source?: string; interest?: string; budget?: number; propertyId?: string; status?: string; notes?: string; nextFollowup?: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const payload: any = {
-      name: data.name, phone: data.phone || null, email: data.email || null,
-      source: data.source || null, interest: data.interest || null,
-      budget: data.budget ?? null, property_id: data.propertyId || null,
-      status: data.status || "novo", notes: data.notes || null,
-      next_followup: data.nextFollowup || null, updated_at: new Date().toISOString(),
-    };
-    if (data.id) {
-      const { error } = await s.from("leads").update(payload).eq("id", data.id);
-      if (error) throw error;
-      return { ok: true, id: data.id };
-    }
-    const { data: row, error } = await s.from("leads").insert(payload).select("id").single();
-    if (error) throw error;
-    return { ok: true, id: row.id };
-  });
-
-export const updateLeadStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string; status: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const { error } = await s.from("leads").update({ status: data.status, updated_at: new Date().toISOString() }).eq("id", data.id);
-    if (error) throw error;
-    return { ok: true };
-  });
-
-export const deleteLead = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    await s.from("leads").delete().eq("id", data.id);
-    return { ok: true };
-  });
-
-// ---------- TASKS ----------
-export const listTasks = createServerFn({ method: "GET" })
-  .inputValidator((d: { status?: string } = {}) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    let q = s.from("tasks").select("*, tenants(id, name), leads(id, name), properties(id, name)").order("due_date");
-    if (data.status && data.status !== "all") q = q.eq("status", data.status);
-    const { data: rows, error } = await q.limit(500);
-    if (error) throw error;
-    return rows ?? [];
-  });
-
-export const upsertTask = createServerFn({ method: "POST" })
-  .inputValidator((d: { id?: string; title: string; description?: string; dueDate: string; priority?: string; tenantId?: string; leadId?: string; propertyId?: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const payload: any = {
-      title: data.title, description: data.description || null,
-      due_date: data.dueDate, priority: data.priority || "normal",
-      tenant_id: data.tenantId || null, lead_id: data.leadId || null, property_id: data.propertyId || null,
-      updated_at: new Date().toISOString(),
-    };
-    if (data.id) {
-      const { error } = await s.from("tasks").update(payload).eq("id", data.id);
-      if (error) throw error;
-      return { ok: true, id: data.id };
-    }
-    const { data: row, error } = await s.from("tasks").insert(payload).select("id").single();
-    if (error) throw error;
-    return { ok: true, id: row.id };
-  });
-
-export const toggleTaskStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string; status: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const { error } = await s.from("tasks").update({
-      status: data.status,
-      completed_at: data.status === "done" ? new Date().toISOString() : null,
-    }).eq("id", data.id);
-    if (error) throw error;
-    return { ok: true };
-  });
-
-export const deleteTask = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    await s.from("tasks").delete().eq("id", data.id);
-    return { ok: true };
-  });
-
-// ---------- EXPENSES ----------
-export const listExpenses = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await admin();
-  const { data } = await s.from("expenses").select("*, properties(id, name)").order("expense_date", { ascending: false }).limit(500);
-  return data ?? [];
-});
-
-export const upsertExpense = createServerFn({ method: "POST" })
-  .inputValidator((d: { id?: string; description: string; category?: string; amount: number; expenseDate: string; propertyId?: string; notes?: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const payload: any = {
-      description: data.description, category: data.category || null,
-      amount: data.amount, expense_date: data.expenseDate,
-      property_id: data.propertyId || null, notes: data.notes || null,
-    };
-    if (data.id) { await s.from("expenses").update(payload).eq("id", data.id); return { ok: true }; }
-    await s.from("expenses").insert(payload);
-    return { ok: true };
-  });
-
-export const deleteExpense = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    await s.from("expenses").delete().eq("id", data.id);
-    return { ok: true };
-  });
-
-// ---------- RECEIPTS HISTORY ----------
-export const listReceipts = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await admin();
-  const { data } = await s.from("receipts_history")
-    .select("*, tenants(id, name, properties(id, name))")
-    .order("issued_at", { ascending: false }).limit(500);
-  return data ?? [];
-});
-
-export const registerReceipt = createServerFn({ method: "POST" })
-  .inputValidator((d: { paymentId?: string; tenantId?: string; amount: number; referenceMonth?: string; notes?: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    const year = new Date().getFullYear();
-    const { count } = await s.from("receipts_history").select("*", { count: "exact", head: true })
-      .gte("issued_at", `${year}-01-01`).lt("issued_at", `${year + 1}-01-01`);
-    const seq = String((count ?? 0) + 1).padStart(4, "0");
-    const number = `${year}/${seq}`;
-    await s.from("receipts_history").insert({
-      payment_id: data.paymentId || null, tenant_id: data.tenantId || null,
-      amount: data.amount, reference_month: data.referenceMonth || null,
-      notes: data.notes || null, receipt_number: number,
-    });
-    return { ok: true, number };
-  });
-
-export const getAnyPaymentForReceipt = createServerFn({ method: "GET" }).handler(async () => {
-  const s = await admin();
-  let { data } = await s.from("payments")
-    .select("id, amount, paid_amount, due_date, paid_date, status, tenant_id, tenants(id, name, cpf, house_number, properties(id, name, address))")
-    .eq("status", "paid").order("paid_date", { ascending: false }).limit(1).maybeSingle();
-  if (!data) {
-    const r = await s.from("payments")
-      .select("id, amount, paid_amount, due_date, paid_date, status, tenant_id, tenants(id, name, cpf, house_number, properties(id, name, address))")
-      .order("due_date", { ascending: false }).limit(1).maybeSingle();
-    data = r.data;
-  }
-  return data;
-});
-
-// ---------- REPORTS ----------
-export const getReports = createServerFn({ method: "GET" }).handler(async () => {
-  await syncOverdue();
-  const s = await admin();
-  const [paymentsRes, propsRes, tenantsRes, expensesRes] = await Promise.all([
-    s.from("payments").select("amount, paid_amount, status, due_date, paid_date").limit(5000),
-    s.from("properties").select("id, name"),
-    s.from("tenants").select("id, status, property_id, rent_amount"),
-    s.from("expenses").select("amount, expense_date, category"),
-  ]);
-  const payments = paymentsRes.data ?? [];
-  const props = propsRes.data ?? [];
-  const tenants = tenantsRes.data ?? [];
-  const expenses = expensesRes.data ?? [];
-
-  const totalReceived = payments.filter(p => p.status === "paid").reduce((a, p) => a + Number(p.paid_amount ?? p.amount ?? 0), 0);
-  const totalOverdue = payments.filter(p => p.status !== "paid" && p.due_date < today()).reduce((a, p) => a + Number(p.amount ?? 0), 0);
-  const totalExpenses = expenses.reduce((a, e) => a + Number(e.amount ?? 0), 0);
-
-  const occupancyByProperty = props.map(p => ({
-    property: p.name,
-    tenants: tenants.filter(t => t.property_id === p.id && t.status === "active").length,
-  }));
-
-  const monthly: Record<string, { received: number; expenses: number }> = {};
-  payments.forEach(p => {
-    if (p.paid_date) {
-      const k = p.paid_date.slice(0, 7);
-      monthly[k] = monthly[k] || { received: 0, expenses: 0 };
-      monthly[k].received += Number(p.paid_amount ?? p.amount ?? 0);
-    }
-  });
-  expenses.forEach(e => {
-    const k = e.expense_date.slice(0, 7);
-    monthly[k] = monthly[k] || { received: 0, expenses: 0 };
-    monthly[k].expenses += Number(e.amount ?? 0);
-  });
-  const cashflow = Object.entries(monthly).sort(([a], [b]) => a.localeCompare(b)).map(([month, v]) => ({ month, ...v, profit: v.received - v.expenses }));
-
-  return { totalReceived, totalOverdue, totalExpenses, profit: totalReceived - totalExpenses, occupancyByProperty, cashflow };
-});
-
-// ---------- SEED DEMO LEADS ----------
-export const seedDemoLeads = createServerFn({ method: "POST" }).handler(async () => {
-  const s = await admin();
-  const { count } = await s.from("leads").select("*", { count: "exact", head: true });
-  if ((count ?? 0) > 0) return { ok: true, skipped: true };
-  await s.from("leads").insert([
-    { name: "Carlos Pereira", phone: "(85) 98888-1111", email: "carlos@email.com", source: "Instagram", interest: "Casa 2 quartos", budget: 1200, status: "novo" },
-    { name: "Ana Souza", phone: "(85) 98888-2222", email: "ana@email.com", source: "Indicação", interest: "Apartamento", budget: 1500, status: "contato" },
-    { name: "João Lima", phone: "(85) 98888-3333", source: "Site", interest: "Comercial", budget: 2500, status: "visita" },
-    { name: "Maria Costa", phone: "(85) 98888-4444", email: "maria@email.com", source: "Facebook", interest: "Casa térrea", budget: 1100, status: "proposta" },
-  ]);
+  await s.from("tenants").update({ status: "inactive" }).eq("id", data.id);
+  await s.from("contracts").update({ status: "ended" }).eq("tenant_id", data.id).eq("status", "active");
   return { ok: true };
-});
-
-// ---------- BOT / ASSISTENTE ----------
-import { chargeMessage, overdueMessage, contractEndingMessage } from "@/lib/bot-templates";
-
-type BotSuggestion = {
-  key: string;
-  type: "overdue" | "due_soon" | "contract_ending" | "receipt_pending";
-  priority: number;
-  tenantId: string;
-  tenantName: string;
-  tenantPhone: string | null;
-  title: string;
-  subtitle: string;
-  message: string;
-  amount?: number;
-  dueDate?: string;
 };
 
-export const listBotSuggestions = createServerFn({ method: "GET" }).handler(async (): Promise<BotSuggestion[]> => {
-  await syncOverdue();
+// ---------- PROPERTIES ----------
+export const listProperties = async () => {
   const s = await admin();
-  const todayStr = today();
-  const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-  const in60 = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+  const { data, error } = await s.from("properties").select("*").order("name");
+  if (error) throw error;
+  return data ?? [];
+};
 
-  const [{ data: payments }, { data: contracts }, { data: handled }] = await Promise.all([
-    s.from("payments")
-      .select("id, amount, due_date, status, tenant_id, tenants(id, name, phone, pix_payer, due_day, rent_amount)")
-      .neq("status", "paid").limit(2000),
-    s.from("contracts")
-      .select("id, end_date, status, tenant_id, tenants(id, name, phone)")
-      .eq("status", "active").not("end_date", "is", null).lte("end_date", in60).gte("end_date", todayStr),
-    s.from("bot_actions").select("payload, status").in("status", ["done", "dismissed"]).limit(5000),
+export const getProperty = async (data: { id: string }) => {
+  const s = await admin();
+  const { data: p } = await s.from("properties").select("*, tenants(*)").eq("id", data.id).single();
+  return p;
+};
+
+export const upsertProperty = async (data: { id?: string; name: string; address?: string; category?: string }) => {
+  const s = await admin();
+  const payload = { name: data.name, address: data.address || null, category: data.category || "casa" };
+  if (data.id) {
+    await s.from("properties").update(payload).eq("id", data.id);
+    return { ok: true, id: data.id };
+  }
+  const { data: row } = await s.from("properties").insert(payload).select("id").single();
+  return { ok: true, id: row?.id };
+};
+
+// ---------- CONTRACTS ----------
+export const listContracts = async () => {
+  const s = await admin();
+  const { data } = await s.from("contracts").select("*, tenants(name), properties(name)").order("start_date", { ascending: false });
+  return data ?? [];
+};
+
+// ---------- EX-INQUILINOS / FORMER ----------
+export const listFormerTenants = async () => {
+  const s = await admin();
+  const { data } = await s.from("former_tenants").select("*").order("end_date", { ascending: false });
+  return data ?? [];
+};
+
+export const getFormerTenant = async (data: { id: string }) => {
+  const s = await admin();
+  const { data: t } = await s.from("former_tenants").select("*").eq("id", data.id).single();
+  return t;
+};
+
+export const endTenancy = async (data: { tenantId: string; endDate: string; notes?: string }) => {
+  const s = await admin();
+  const { data: t } = await s.from("tenants").select("*, properties(name)").eq("id", data.tenantId).single();
+  if (!t) throw new Error("Inquilino não encontrado");
+  await s.from("former_tenants").insert({
+    name: t.name, property_name: t.properties?.name || "Desconhecido",
+    phone: t.phone, email: t.email, cpf: t.cpf, start_date: t.start_date,
+    end_date: data.endDate, rent_amount: t.rent_amount, notes: data.notes || t.notes,
+  });
+  await s.from("tenants").delete().eq("id", data.tenantId);
+  return { ok: true };
+};
+
+// ---------- ALERTS ----------
+export const listAlerts = async () => {
+  const s = await admin();
+  const { data } = await s.from("alerts").select("*").order("created_at", { ascending: false });
+  return data ?? [];
+};
+
+export const dismissAlert = async (data: { id: string }) => {
+  const s = await admin();
+  await s.from("alerts").delete().eq("id", data.id);
+  return { ok: true };
+};
+
+// ---------- CALENDARIO ----------
+export const listMonthPayments = async (data: { year: number; month: number }) => {
+  const s = await admin();
+  const mm = String(data.month).padStart(2, "0");
+  const start = `${data.year}-${mm}-01`;
+  const lastDay = new Date(data.year, data.month, 0).getDate();
+  const end = `${data.year}-${mm}-${String(lastDay).padStart(2, "0")}`;
+  const { data: rows } = await s.from("payments").select("id, amount, due_date, status, tenant_id").gte("due_date", start).lte("due_date", end);
+  return rows ?? [];
+};
+
+// ---------- CRM / LEADS ----------
+export const listLeads = async () => {
+  const s = await admin();
+  const { data } = await s.from("leads").select("*").order("created_at", { ascending: false });
+  return data ?? [];
+};
+
+export const upsertLead = async (data: { id?: string; name: string; phone?: string; email?: string; status?: string; notes?: string; source?: string }) => {
+  const s = await admin();
+  const payload = { name: data.name, phone: data.phone, email: data.email, status: data.status || "new", notes: data.notes, source: data.source };
+  if (data.id) {
+    await s.from("leads").update(payload).eq("id", data.id);
+    return { ok: true, id: data.id };
+  }
+  const { data: row } = await s.from("leads").insert(payload).select("id").single();
+  return { ok: true, id: row?.id };
+};
+
+export const updateLeadStatus = async (data: { id: string; status: string }) => {
+  const s = await admin();
+  await s.from("leads").update({ status: data.status }).eq("id", data.id);
+  return { ok: true };
+};
+
+export const deleteLead = async (data: { id: string }) => {
+  const s = await admin();
+  await s.from("leads").delete().eq("id", data.id);
+  return { ok: true };
+};
+
+// ---------- TASKS ----------
+export const listTasks = async (data: { tenantId?: string } = {}) => {
+  const s = await admin();
+  let q = s.from("tasks").select("*, tenants(name)").order("due_date", { ascending: true });
+  if (data.tenantId) q = q.eq("tenant_id", data.tenantId);
+  const { data: rows } = await q;
+  return rows ?? [];
+};
+
+export const upsertTask = async (data: { id?: string; title: string; description?: string; dueDate?: string; priority?: string; tenantId?: string }) => {
+  const s = await admin();
+  const payload = { title: data.title, description: data.description, due_date: data.dueDate, priority: data.priority || "medium", tenant_id: data.tenantId };
+  if (data.id) {
+    await s.from("tasks").update(payload).eq("id", data.id);
+    return { ok: true, id: data.id };
+  }
+  const { data: row } = await s.from("tasks").insert(payload).select("id").single();
+  return { ok: true, id: row?.id };
+};
+
+export const toggleTaskStatus = async (data: { id: string; completed: boolean }) => {
+  const s = await admin();
+  await s.from("tasks").update({ status: data.completed ? "completed" : "pending" }).eq("id", data.id);
+  return { ok: true };
+};
+
+export const deleteTask = async (data: { id: string }) => {
+  const s = await admin();
+  await s.from("tasks").delete().eq("id", data.id);
+  return { ok: true };
+};
+
+// ---------- EXPENSES ----------
+export const listExpenses = async (data: { month?: string } = {}) => {
+  const s = await admin();
+  let q = s.from("expenses").select("*").order("date", { ascending: false });
+  if (data.month) {
+    const [y, m] = data.month.split("-").map(Number);
+    const start = `${y}-${String(m).padStart(2, "0")}-01`;
+    const end = `${y}-${String(m).padStart(2, "0")}-31`;
+    q = q.gte("date", start).lte("date", end);
+  }
+  const { data: rows } = await q;
+  return rows ?? [];
+};
+
+export const upsertExpense = async (data: { id?: string; description: string; amount: number; date: string; category?: string; propertyId?: string }) => {
+  const s = await admin();
+  const payload = { description: data.description, amount: data.amount, date: data.date, category: data.category || "outros", property_id: data.propertyId };
+  if (data.id) {
+    await s.from("expenses").update(payload).eq("id", data.id);
+    return { ok: true, id: data.id };
+  }
+  const { data: row } = await s.from("expenses").insert(payload).select("id").single();
+  return { ok: true, id: row?.id };
+};
+
+// ---------- RECEIPTS ----------
+export const listReceipts = async (data: { tenantId?: string } = {}) => {
+  const s = await admin();
+  let q = s.from("receipts_history").select("*, tenants(name)").order("issued_at", { ascending: false });
+  if (data.tenantId) q = q.eq("tenant_id", data.tenantId);
+  const { data: rows } = await q;
+  return rows ?? [];
+};
+
+export const registerReceipt = async (data: { tenantId: string; amount: number; referenceMonth: string; notes?: string; receiptNumber: string }) => {
+  const s = await admin();
+  await s.from("receipts_history").insert({
+    tenant_id: data.tenantId, amount: data.amount, reference_month: data.referenceMonth, notes: data.notes, receipt_number: data.receiptNumber
+  });
+  return { ok: true };
+};
+
+export const getAnyPaymentForReceipt = async (data: { tenantId: string }) => {
+  const s = await admin();
+  const { data: p } = await s.from("payments").select("*, tenants(*)").eq("tenant_id", data.tenantId).order("due_date", { ascending: false }).limit(1).maybeSingle();
+  return p;
+};
+
+// ---------- REPORTS ----------
+export const getFinancialReport = async (data: { year: number }) => {
+  const s = await admin();
+  const start = `${data.year}-01-01`;
+  const end = `${data.year}-12-31`;
+  const [paymentsRes, expensesRes] = await Promise.all([
+    s.from("payments").select("amount, paid_amount, paid_date, status").gte("paid_date", start).lte("paid_date", end).eq("status", "paid"),
+    s.from("expenses").select("amount, date").gte("date", start).lte("date", end),
   ]);
-
-  const handledKeys = new Set((handled ?? []).map((h: any) => h.payload?.key).filter(Boolean));
-  const out: BotSuggestion[] = [];
-
-  (payments ?? []).forEach((p: any) => {
-    if (!p.tenants) return;
-    const due = new Date(p.due_date + "T12:00:00");
-    const [y, m] = p.due_date.split("-").map(Number);
-    const isOverdue = p.due_date < todayStr;
-    const isDueSoon = !isOverdue && p.due_date <= in7;
-    if (!isOverdue && !isDueSoon) return;
-    const key = `${isOverdue ? "overdue" : "due_soon"}:${p.id}`;
-    if (handledKeys.has(key)) return;
-    const daysLate = Math.floor((Date.now() - due.getTime()) / 86400000);
-    const message = isOverdue
-      ? overdueMessage({ name: p.tenants.name, amount: Number(p.amount), daysLate, pix: p.tenants.pix_payer })
-      : chargeMessage({ name: p.tenants.name, amount: Number(p.amount), year: y, month: m, pix: p.tenants.pix_payer, dueDay: p.tenants.due_day });
-    out.push({
-      key, type: isOverdue ? "overdue" : "due_soon",
-      priority: isOverdue ? 100 + daysLate : 50,
-      tenantId: p.tenants.id, tenantName: p.tenants.name, tenantPhone: p.tenants.phone,
-      title: isOverdue ? `Cobrar atraso de ${p.tenants.name}` : `Lembrar vencimento — ${p.tenants.name}`,
-      subtitle: isOverdue ? `${daysLate} dia(s) em atraso · ${p.due_date}` : `Vence em ${p.due_date}`,
-      message, amount: Number(p.amount), dueDate: p.due_date,
-    });
+  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const revenue = new Array(12).fill(0);
+  const expenses = new Array(12).fill(0);
+  (paymentsRes.data ?? []).forEach(p => {
+    const m = new Date(p.paid_date!).getMonth();
+    revenue[m] += Number(p.paid_amount ?? p.amount ?? 0);
   });
-
-  (contracts ?? []).forEach((c: any) => {
-    if (!c.tenants) return;
-    const key = `contract_ending:${c.id}`;
-    if (handledKeys.has(key)) return;
-    out.push({
-      key, type: "contract_ending", priority: 30,
-      tenantId: c.tenants.id, tenantName: c.tenants.name, tenantPhone: c.tenants.phone,
-      title: `Contrato vence em breve — ${c.tenants.name}`,
-      subtitle: `Vencimento em ${c.end_date}`,
-      message: contractEndingMessage({ name: c.tenants.name, endDate: c.end_date }),
-      dueDate: c.end_date,
-    });
+  (expensesRes.data ?? []).forEach(e => {
+    const m = new Date(e.date).getMonth();
+    expenses[m] += Number(e.amount ?? 0);
   });
+  return months.map((name, i) => ({ name, revenue: revenue[i], expenses: expenses[i], profit: revenue[i] - expenses[i] }));
+};
 
-  return out.sort((a, b) => b.priority - a.priority);
-});
-
-export const resolveBotSuggestion = createServerFn({ method: "POST" })
-  .inputValidator((d: { key: string; tenantId?: string | null; type: string; status: "done" | "dismissed"; message?: string }) => d)
-  .handler(async ({ data }) => {
-    const s = await admin();
-    await s.from("bot_actions").insert({
-      tenant_id: data.tenantId ?? null,
-      type: data.type,
-      status: data.status,
-      message: data.message ?? null,
-      done_at: new Date().toISOString(),
-      payload: { key: data.key },
-    });
-    return { ok: true };
-  });
-
+// ---------- ASSISTANT / BOT ----------
+export const getAssistantSuggestions = async () => {
+  // Mock or simple logic for suggestions
+  return [
+    { id: "1", title: "Cobranças atrasadas", description: "Existem 5 inquilinos com pagamentos atrasados há mais de 3 dias.", action: "Ver inadimplência", link: "/inadimplencia" },
+    { id: "2", title: "Contratos vencendo", description: "3 contratos vencem nos próximos 30 dias.", action: "Ver contratos", link: "/contratos" },
+  ];
+};

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/rpc";
 import { useQueryClient } from "@tanstack/react-query";
 import { setMonthStatus } from "@/lib/api/crm.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
