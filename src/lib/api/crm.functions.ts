@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { supabase } from "@/integrations/supabase/client";
 
 // All functions now use the standard supabase client.

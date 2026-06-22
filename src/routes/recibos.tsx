@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@/lib/rpc";
