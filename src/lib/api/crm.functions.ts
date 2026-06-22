@@ -325,15 +325,33 @@ export const deactivateTenant = async (data: { id: string }) => {
 // ---------- PROPERTIES ----------
 export const listProperties = async () => {
   const s = await admin();
-  const { data, error } = await s.from("properties").select("*").order("name");
+  const { data, error } = await s
+    .from("properties")
+    .select("*, tenants(id, name, phone, rent_amount, due_day, start_date, house_number, status)")
+    .order("name");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((p: any) => ({
+    ...p,
+    tenants: (p.tenants ?? []).filter((t: any) => t.status === "active"),
+  }));
 };
 
 export const getProperty = async (data: { id: string }) => {
   const s = await admin();
-  const { data: p } = await s.from("properties").select("*, tenants(*)").eq("id", data.id).single();
-  return p;
+  const { data: p } = await s
+    .from("properties")
+    .select("*, tenants(*)")
+    .eq("id", data.id)
+    .maybeSingle();
+  const propName = (p as any)?.name ?? "";
+  const { data: former } = await s
+    .from("former_tenants")
+    .select("*")
+    .eq("property_name", propName)
+    .order("end_date", { ascending: false });
+  const tenants = ((p as any)?.tenants ?? []).filter((t: any) => t.status === "active");
+  const formerTenants = former ?? [];
+  return { property: p, tenants, formerTenants };
 };
 
 export const upsertProperty = async (data: { id?: string; name: string; address?: string; category?: string }) => {
