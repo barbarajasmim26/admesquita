@@ -338,10 +338,17 @@ export const listProperties = async () => {
 
 export const getProperty = async (data: { id: string }) => {
   const s = await admin();
-  const [{ data: p }, { data: former }] = await Promise.all([
-    s.from("properties").select("*, tenants(*)").eq("id", data.id).maybeSingle(),
-    s.from("former_tenants").select("*").eq("property_name", "").limit(0),
-  ]);
+  const { data: p } = await s
+    .from("properties")
+    .select("*, tenants(*)")
+    .eq("id", data.id)
+    .maybeSingle();
+  const propName = (p as any)?.name ?? "";
+  const { data: former } = await s
+    .from("former_tenants")
+    .select("*")
+    .eq("property_name", propName)
+    .order("end_date", { ascending: false });
   const tenants = ((p as any)?.tenants ?? []).filter((t: any) => t.status === "active");
   const formerTenants = former ?? [];
   return { property: p, tenants, formerTenants };
