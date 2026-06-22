@@ -544,3 +544,80 @@ export const getAssistantSuggestions = async () => {
     { id: "2", title: "Contratos vencendo", description: "3 contratos vencem nos próximos 30 dias.", action: "Ver contratos", link: "/contratos" },
   ];
 };
+
+// ---------- BOT SUGGESTIONS ----------
+export const listBotSuggestions = async (): Promise<any[]> => {
+  // Stub: returns no pending suggestions. Real logic to be wired later.
+  return [];
+};
+
+export const resolveBotSuggestion = async (_args?: any) => {
+  // Stub: acknowledges a suggestion resolution. No-op until bot_actions wiring is restored.
+  return { ok: true };
+};
+
+// ---------- DEMO SEED ----------
+export const seedDemoLeads = async () => {
+  // Stub: demo seeding disabled in production data.
+  return { ok: true, inserted: 0 };
+};
+
+// ---------- REPORTS (aggregated) ----------
+export const getReports = async () => {
+  const s = await admin();
+  const year = new Date().getFullYear();
+  const start = `${year}-01-01`;
+  const end = `${year}-12-31`;
+  const [paymentsRes, expensesRes, propsRes, tenantsRes] = await Promise.all([
+    s.from("payments").select("amount, paid_amount, paid_date, status, due_date"),
+    s.from("expenses").select("amount, date").gte("date", start).lte("date", end),
+    s.from("properties").select("id, name"),
+    s.from("tenants").select("id, property_id, status").eq("status", "active"),
+  ]);
+  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const received = new Array(12).fill(0);
+  const expByMonth = new Array(12).fill(0);
+  let totalReceived = 0;
+  let totalOverdue = 0;
+  (paymentsRes.data ?? []).forEach((p: any) => {
+    if (p.status === "paid" && p.paid_date) {
+      const d = new Date(p.paid_date);
+      if (d.getFullYear() === year) {
+        const v = Number(p.paid_amount ?? p.amount ?? 0);
+        received[d.getMonth()] += v;
+        totalReceived += v;
+      }
+    }
+    if (p.status === "overdue") totalOverdue += Number(p.amount ?? 0);
+  });
+  let totalExpenses = 0;
+  (expensesRes.data ?? []).forEach((e: any) => {
+    const m = new Date(e.date).getMonth();
+    const v = Number(e.amount ?? 0);
+    expByMonth[m] += v;
+    totalExpenses += v;
+  });
+  const cashflow = months.map((name, i) => ({
+    month: name,
+    received: received[i],
+    expenses: expByMonth[i],
+    profit: received[i] - expByMonth[i],
+  }));
+  const tenantsByProp = new Map<string, number>();
+  (tenantsRes.data ?? []).forEach((t: any) => {
+    if (!t.property_id) return;
+    tenantsByProp.set(t.property_id, (tenantsByProp.get(t.property_id) ?? 0) + 1);
+  });
+  const occupancyByProperty = (propsRes.data ?? []).map((p: any) => ({
+    property: p.name,
+    tenants: tenantsByProp.get(p.id) ?? 0,
+  }));
+  return {
+    totalReceived,
+    totalOverdue,
+    totalExpenses,
+    profit: totalReceived - totalExpenses,
+    cashflow,
+    occupancyByProperty,
+  };
+};
