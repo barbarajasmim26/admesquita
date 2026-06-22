@@ -75,6 +75,7 @@ export type Database = {
           due_at: string | null
           id: string
           message: string | null
+          owner_id: string | null
           payload: Json | null
           status: string
           tenant_id: string | null
@@ -87,6 +88,7 @@ export type Database = {
           due_at?: string | null
           id?: string
           message?: string | null
+          owner_id?: string | null
           payload?: Json | null
           status?: string
           tenant_id?: string | null
@@ -99,6 +101,7 @@ export type Database = {
           due_at?: string | null
           id?: string
           message?: string | null
+          owner_id?: string | null
           payload?: Json | null
           status?: string
           tenant_id?: string | null
@@ -583,6 +586,7 @@ export type Database = {
           id: string
           issued_at: string
           notes: string | null
+          owner_id: string | null
           payment_id: string | null
           receipt_number: string
           reference_month: string | null
@@ -593,6 +597,7 @@ export type Database = {
           id?: string
           issued_at?: string
           notes?: string | null
+          owner_id?: string | null
           payment_id?: string | null
           receipt_number: string
           reference_month?: string | null
@@ -603,6 +608,7 @@ export type Database = {
           id?: string
           issued_at?: string
           notes?: string | null
+          owner_id?: string | null
           payment_id?: string | null
           receipt_number?: string
           reference_month?: string | null
