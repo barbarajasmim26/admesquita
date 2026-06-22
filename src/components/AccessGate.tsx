@@ -3,9 +3,22 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import logo from "@/assets/mesquita-logo.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const ACCESS_CODE = "@mesquita2022";
 const STORAGE_KEY = "mesquita.access";
+const AUTH_EMAIL = "bbjasmim2@gmail.com";
+const AUTH_PASSWORD = "@mesquita2022";
+
+async function ensureSession() {
+  const { data } = await supabase.auth.getSession();
+  if (data.session) return true;
+  const { error } = await supabase.auth.signInWithPassword({
+    email: AUTH_EMAIL,
+    password: AUTH_PASSWORD,
+  });
+  return !error;
+}
 
 export function AccessGate({ children }: { children: ReactNode }) {
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
@@ -13,20 +26,28 @@ export function AccessGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    try {
-      setUnlocked(localStorage.getItem(STORAGE_KEY) === ACCESS_CODE);
-    } catch {
-      setUnlocked(false);
-    }
+    (async () => {
+      try {
+        if (localStorage.getItem(STORAGE_KEY) === ACCESS_CODE) {
+          await ensureSession();
+          setUnlocked(true);
+        } else {
+          setUnlocked(false);
+        }
+      } catch {
+        setUnlocked(false);
+      }
+    })();
   }, []);
 
   if (unlocked === null) return null;
   if (unlocked) return <>{children}</>;
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (code.trim() === ACCESS_CODE) {
       localStorage.setItem(STORAGE_KEY, ACCESS_CODE);
+      await ensureSession();
       setUnlocked(true);
     } else {
       setError(true);
