@@ -325,9 +325,15 @@ export const deactivateTenant = async (data: { id: string }) => {
 // ---------- PROPERTIES ----------
 export const listProperties = async () => {
   const s = await admin();
-  const { data, error } = await s.from("properties").select("*").order("name");
+  const { data, error } = await s
+    .from("properties")
+    .select("*, tenants(id, name, phone, rent_amount, due_day, start_date, house_number, status)")
+    .order("name");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((p: any) => ({
+    ...p,
+    tenants: (p.tenants ?? []).filter((t: any) => t.status === "active"),
+  }));
 };
 
 export const getProperty = async (data: { id: string }) => {
