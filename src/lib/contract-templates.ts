@@ -45,11 +45,10 @@ export const CONTRACT_TEMPLATES: ContractTemplate[] = [
   },
   {
     id: "joaquim",
-    label: "Joaquim Cartaxo — Luciano Rodrigues",
+    label: "Joaquim Cartaxo",
     propertyNameMatch: "joaquim cartaxo",
-    defaultAddress: "Rua Luciano Rodrigues, Rio Novo, Cascavel/CE",
+    defaultAddress: "Joaquim Cartaxo, Cascavel/CE",
     forumCity: "Cascavel",
-    notes: "Imóvel localizado na Rua Luciano Rodrigues — endereço Joaquim Cartaxo",
   },
 ];
 
