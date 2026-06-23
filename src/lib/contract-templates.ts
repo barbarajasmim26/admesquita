@@ -47,7 +47,7 @@ export const CONTRACT_TEMPLATES: ContractTemplate[] = [
     id: "joaquim",
     label: "Joaquim Cartaxo",
     propertyNameMatch: "joaquim cartaxo",
-    defaultAddress: "Rua Luciano Rodrigues, Rio Novo, Cascavel/CE",
+    defaultAddress: "Rua Joaquim Cartaxo, Cascavel/CE",
     forumCity: "Cascavel",
   },
 ];
