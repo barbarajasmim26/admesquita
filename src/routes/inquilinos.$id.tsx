@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { MonthlyPaymentGrid } from "@/components/MonthlyPaymentGrid";
 import { chargeMessage, receiptMessage, waLink } from "@/lib/bot-templates";
 
-const opts = (id: string) => queryOptions({ queryKey: ["tenant", id], queryFn: () => getTenant({ data: { id } }) });
+const opts = (id: string) => queryOptions({ queryKey: ["tenant", id], queryFn: () => getTenant({ id }) });
 
 export const Route = createFileRoute("/inquilinos/$id")({
   head: () => ({ meta: [{ title: "Inquilino — Mesquita Imóveis" }] }),

@@ -12,7 +12,7 @@ import { PropertyDialog } from "@/components/PropertyDialog";
 import { TenantDialog } from "@/components/TenantDialog";
 import { ArrowLeft, Pencil, Plus, Users } from "lucide-react";
 
-const opts = (id: string) => queryOptions({ queryKey: ["property", id], queryFn: () => getProperty({ data: { id } }) });
+const opts = (id: string) => queryOptions({ queryKey: ["property", id], queryFn: () => getProperty({ id }) });
 
 export const Route = createFileRoute("/imoveis/$id")({
   head: () => ({ meta: [{ title: "Imóvel — Mesquita Imóveis" }] }),
