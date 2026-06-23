@@ -368,7 +368,7 @@ export const upsertProperty = async (data: { id?: string; name: string; address?
 // ---------- CONTRACTS ----------
 export const listContracts = async () => {
   const s = await admin();
-  const { data } = await s.from("contracts").select("*, tenants(name), properties(name)").order("start_date", { ascending: false });
+  const { data } = await s.from("contracts").select("*, tenants(id, name), properties(id, name)").order("start_date", { ascending: false });
   return data ?? [];
 };
 
