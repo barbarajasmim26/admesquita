@@ -43,6 +43,14 @@ export const CONTRACT_TEMPLATES: ContractTemplate[] = [
     defaultAddress: "Rua Sigefredo Bessa, Bessalândia, Cascavel/CE",
     forumCity: "Cascavel",
   },
+  {
+    id: "joaquim",
+    label: "Joaquim Cartaxo — Luciano Rodrigues",
+    propertyNameMatch: "joaquim cartaxo",
+    defaultAddress: "Rua Luciano Rodrigues, Rio Novo, Cascavel/CE",
+    forumCity: "Cascavel",
+    notes: "Imóvel localizado na Rua Luciano Rodrigues — endereço Joaquim Cartaxo",
+  },
 ];
 
 export function findTemplateForProperty(propertyName?: string | null): ContractTemplate | undefined {
