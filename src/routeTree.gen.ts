@@ -20,7 +20,6 @@ import { Route as ExInquilinosRouteImport } from './routes/ex-inquilinos'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as ContratosRouteImport } from './routes/contratos'
 import { Route as CalendarioRouteImport } from './routes/calendario'
-import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as IndexRouteImport } from './routes/index'
@@ -85,11 +84,6 @@ const CalendarioRoute = CalendarioRouteImport.update({
   path: '/calendario',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AssistenteRoute = AssistenteRouteImport.update({
-  id: '/assistente',
-  path: '/assistente',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AlertasRoute = AlertasRouteImport.update({
   id: '/alertas',
   path: '/alertas',
@@ -135,7 +129,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/alertas': typeof AlertasRoute
-  '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
@@ -157,7 +150,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/alertas': typeof AlertasRoute
-  '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
@@ -178,7 +170,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/alertas': typeof AlertasRoute
-  '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
@@ -202,7 +193,6 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/alertas'
-    | '/assistente'
     | '/calendario'
     | '/contratos'
     | '/crm'
@@ -224,7 +214,6 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/alertas'
-    | '/assistente'
     | '/calendario'
     | '/contratos'
     | '/crm'
@@ -244,7 +233,6 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/alertas'
-    | '/assistente'
     | '/calendario'
     | '/contratos'
     | '/crm'
@@ -267,7 +255,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   AlertasRoute: typeof AlertasRoute
-  AssistenteRoute: typeof AssistenteRoute
   CalendarioRoute: typeof CalendarioRoute
   ContratosRoute: typeof ContratosRoute
   CrmRoute: typeof CrmRoute
@@ -358,13 +345,6 @@ declare module '@tanstack/react-router' {
       path: '/calendario'
       fullPath: '/calendario'
       preLoaderRoute: typeof CalendarioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/assistente': {
-      id: '/assistente'
-      path: '/assistente'
-      fullPath: '/assistente'
-      preLoaderRoute: typeof AssistenteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alertas': {
@@ -469,7 +449,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   AlertasRoute: AlertasRoute,
-  AssistenteRoute: AssistenteRoute,
   CalendarioRoute: CalendarioRoute,
   ContratosRoute: ContratosRoute,
   CrmRoute: CrmRoute,
