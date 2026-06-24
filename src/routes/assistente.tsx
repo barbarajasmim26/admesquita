@@ -130,7 +130,7 @@ function QuickPaymentParser() {
     let ok = 0, fail = 0;
     for (const a of result.actions) {
       try {
-        await (setMonthStatus as any)({ data: { tenantId: a.tenantId, year: a.year, month: a.month, status: a.status } });
+        await setMonthStatus({ tenantId: a.tenantId, year: a.year, month: a.month, status: a.status });
         ok++;
       } catch (e) {
         fail++;
