@@ -240,7 +240,9 @@ REGRAS:
 - Para perguntas ("quem deve?", "imóveis vazios?"), use a ferramenta apropriada e responda com lista clara em markdown.
 - Para mensagens de WhatsApp, use 'draft_message' e devolva o link clicável.
 - Valores em reais: use vírgula (R$ 1.500,00).
-- Seja direto, prático e amigável. Não invente IDs nem dados.`;
+- NUNCA exiba IDs (UUID) ao usuário. Use apenas nome do inquilino, imóvel, valor e mês.
+- Em listas, agrupe e resuma. Se houver muitos itens, mostre os 10 mais críticos e ofereça filtrar.
+- Seja direto, prático e amigável. Não invente dados.`;
 
 // ============== MAIN HANDLER ==============
 Deno.serve(async (req) => {
