@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { brl, formatDateBR } from "@/lib/finance";
 import { downloadReceipt } from "@/lib/receipt-pdf";
-import { FileDown, Sparkles, Plus, Copy, FileText } from "lucide-react";
+import { FileDown, Sparkles, Plus, Copy, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 import { NewReceiptDialog } from "@/components/NewReceiptDialog";
 
@@ -105,6 +105,37 @@ function Page() {
     setNewOpen(true);
   }
 
+  async function downloadFromHistory(r: any) {
+    try {
+      const t = r.tenants ?? {};
+      const prop = t.properties ?? {};
+      // reference_month "MM/YYYY"
+      let m = new Date().getMonth() + 1, y = new Date().getFullYear();
+      if (r.reference_month && /^\d{2}\/\d{4}$/.test(r.reference_month)) {
+        const [mm, yy] = r.reference_month.split("/");
+        m = Number(mm); y = Number(yy);
+      } else if (r.reference_month && /^\d{4}-\d{2}$/.test(r.reference_month)) {
+        const [yy, mm] = r.reference_month.split("-");
+        m = Number(mm); y = Number(yy);
+      }
+      await downloadReceipt({
+        tenantName: t.name ?? "",
+        tenantCpf: t.cpf ?? null,
+        amount: Number(r.amount ?? 0),
+        propertyName: prop.name ?? "",
+        propertyAddress: prop.address ?? null,
+        houseNumber: t.house_number ?? null,
+        referenceMonth: m,
+        referenceYear: y,
+        issueDate: r.issued_at ? new Date(r.issued_at) : new Date(),
+        pixPayer: t.pix_payer ?? null,
+        receiptNumber: r.receipt_number,
+      }, `recibo_${r.receipt_number?.replace(/\//g, "-")}_${(t.name ?? "").replace(/\s+/g, "_")}.pdf`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao baixar");
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -171,7 +202,12 @@ function Page() {
                       <TableCell>{formatDateBR(r.issued_at?.slice(0, 10))}</TableCell>
                       <TableCell className="text-right font-medium">{brl(r.amount)}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" onClick={() => duplicate(r)}><Copy className="size-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="outline" onClick={() => downloadFromHistory(r)} title="Baixar PDF">
+                            <Download className="size-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => duplicate(r)} title="Duplicar"><Copy className="size-4" /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
