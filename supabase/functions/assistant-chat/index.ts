@@ -13,18 +13,59 @@ const today = () => new Date().toISOString().slice(0, 10);
 const ymOf = (d: string) => d.slice(0, 7);
 const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n || 0);
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const norm = (s: string) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+// ============== SMART SEARCH ==============
+// Busca AMPLA: por nome, telefone, endereço, imóvel, proprietário, número da casa.
+// Retorna ranking de candidatos com score.
+async function smartFindTenants(query: string) {
+  const s = sb();
+  const q = norm(query);
+  if (!q) return [];
+  const { data: tenants } = await s.from('tenants')
+    .select('id, name, phone, status, house_number, rent_amount, due_day, cpf, property_id, properties(id, name, address, owner_name, owner_phone)')
+    .limit(2000);
+  const tokens = q.split(' ').filter(t => t.length >= 2);
+  const scored = (tenants ?? []).map((t: any) => {
+    const hay = norm([t.name, t.phone, t.cpf, t.house_number, t.properties?.name, t.properties?.address, t.properties?.owner_name, t.properties?.owner_phone].filter(Boolean).join(' '));
+    let score = 0;
+    if (hay.includes(q)) score += 100;
+    for (const tk of tokens) if (hay.includes(tk)) score += 10;
+    // boost ativos
+    if (t.status === 'active') score += 2;
+    return { t, score };
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
+  return scored.map(({ t, score }) => ({
+    id: t.id, name: t.name, phone: t.phone, status: t.status, house_number: t.house_number,
+    rent: Number(t.rent_amount ?? 0), due_day: t.due_day,
+    property: t.properties?.name, address: t.properties?.address,
+    owner: t.properties?.owner_name, score,
+  }));
+}
+
+async function smartFindProperties(query: string) {
+  const s = sb();
+  const q = norm(query);
+  const { data } = await s.from('properties').select('id, name, address, owner_name, owner_phone, category, tenants(id, name, status)').limit(2000);
+  const tokens = q.split(' ').filter(t => t.length >= 2);
+  const scored = (data ?? []).map((p: any) => {
+    const hay = norm([p.name, p.address, p.owner_name, p.owner_phone, ...(p.tenants ?? []).map((x: any) => x.name)].filter(Boolean).join(' '));
+    let score = 0;
+    if (hay.includes(q)) score += 100;
+    for (const tk of tokens) if (hay.includes(tk)) score += 10;
+    return { p, score };
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 15);
+  return scored.map(({ p }) => ({
+    id: p.id, name: p.name, address: p.address, owner: p.owner_name, owner_phone: p.owner_phone,
+    category: p.category,
+    active_tenants: (p.tenants ?? []).filter((x: any) => x.status === 'active').map((x: any) => x.name),
+  }));
+}
 
 // ============== TOOLS ==============
 
 async function searchTenants(q: string) {
-  const s = sb();
-  const like = `%${q}%`;
-  const { data, error } = await s.from('tenants')
-    .select('id, name, phone, rent_amount, due_day, start_date, status, house_number, properties(id,name,address)')
-    .or(`name.ilike.${like},phone.ilike.${like}`)
-    .limit(20);
-  if (error) throw error;
-  return data ?? [];
+  return smartFindTenants(q);
 }
 
 async function listActiveTenants() {
@@ -94,7 +135,7 @@ async function listContractsEnding(days = 60) {
 }
 
 // Register payment for a specific month. If month omitted, picks oldest open month.
-async function registerPayment(args: { tenantId: string; year?: number; month?: number; paidDate?: string }) {
+async function registerPayment(args: { tenantId: string; year?: number; month?: number; paidDate?: string; amount?: number }) {
   const s = sb();
   const { data: t } = await s.from('tenants').select('id, rent_amount, due_day, name').eq('id', args.tenantId).maybeSingle();
   if (!t) return { error: 'inquilino não encontrado' };
@@ -120,20 +161,113 @@ async function registerPayment(args: { tenantId: string; year?: number; month?: 
   const { data: existing } = await s.from('payments').select('id').eq('tenant_id', args.tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
 
   let pid = existing?.id;
+  const valor = Number(args.amount ?? t.rent_amount ?? 0);
   if (!pid) {
     const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', args.tenantId).eq('status', 'active').limit(1).maybeSingle();
     if (!ct) return { error: 'sem contrato ativo' };
     const dueDay = Math.min(Number(t.due_day ?? 10), lastDay);
     const dueDate = `${year}-${mm}-${String(dueDay).padStart(2, '0')}`;
     const { data: ins, error } = await s.from('payments').insert({
-      tenant_id: args.tenantId, contract_id: ct.id, amount: Number(t.rent_amount ?? 0), due_date: dueDate, status: 'pending',
+      tenant_id: args.tenantId, contract_id: ct.id, amount: valor, due_date: dueDate, status: 'pending',
     }).select('id').single();
     if (error) return { error: error.message };
     pid = ins.id;
   }
   const paidDate = args.paidDate ?? today();
-  await s.from('payments').update({ status: 'paid', paid_date: paidDate, paid_amount: Number(t.rent_amount ?? 0) }).eq('id', pid);
-  return { ok: true, tenant: t.name, month: `${MESES[month! - 1]}/${year}`, amount: Number(t.rent_amount ?? 0), paid_date: paidDate };
+  await s.from('payments').update({ status: 'paid', paid_date: paidDate, paid_amount: valor }).eq('id', pid);
+  return { ok: true, tenant: t.name, competencia: `${MESES[month! - 1]}/${year}`, amount: valor, paid_date: paidDate };
+}
+
+// Desmarca pagamento (volta para pendente) — corrige erros
+async function unmarkPayment(args: { tenantId: string; year: number; month: number }) {
+  const s = sb();
+  const mm = String(args.month).padStart(2, '0');
+  const start = `${args.year}-${mm}-01`;
+  const lastDay = new Date(args.year, args.month, 0).getDate();
+  const end = `${args.year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+  const { data: p } = await s.from('payments').select('id').eq('tenant_id', args.tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
+  if (!p) return { error: 'sem pagamento neste mês' };
+  await s.from('payments').update({ status: 'pending', paid_date: null, paid_amount: null }).eq('id', p.id);
+  return { ok: true, competencia: `${MESES[args.month - 1]}/${args.year}` };
+}
+
+// Atualiza dados do inquilino (vários campos opcionais)
+async function updateTenant(args: { tenantId: string; name?: string; phone?: string; cpf?: string; house_number?: string; rent_amount?: number; due_day?: number; pix_payer?: string; notes?: string; email?: string }) {
+  const s = sb();
+  const payload: any = {};
+  for (const k of ['name','phone','cpf','house_number','rent_amount','due_day','pix_payer','notes','email']) {
+    if ((args as any)[k] !== undefined) payload[k] = (args as any)[k];
+  }
+  if (!Object.keys(payload).length) return { error: 'nenhum campo informado' };
+  const { error } = await s.from('tenants').update(payload).eq('id', args.tenantId);
+  if (error) return { error: error.message };
+  // Se rent_amount mudou, propaga para contrato ativo e pagamentos pendentes
+  if (payload.rent_amount !== undefined) {
+    await s.from('contracts').update({ rent_amount: payload.rent_amount }).eq('tenant_id', args.tenantId).eq('status', 'active');
+    await s.from('payments').update({ amount: payload.rent_amount }).eq('tenant_id', args.tenantId).neq('status', 'paid');
+  }
+  if (payload.due_day !== undefined) {
+    await s.from('contracts').update({ due_day: payload.due_day }).eq('tenant_id', args.tenantId).eq('status', 'active');
+  }
+  return { ok: true, updated: payload };
+}
+
+// Atualiza contrato ativo (datas, valor, índice, fiador)
+async function updateContract(args: { tenantId: string; start_date?: string; end_date?: string; rent_amount?: number; due_day?: number; duration_months?: number; readjustment_index?: string; guarantor_name?: string; guarantor_cpf?: string; guarantor_phone?: string; auto_renew?: boolean; status?: string; terms?: string }) {
+  const s = sb();
+  const payload: any = {};
+  for (const k of ['start_date','end_date','rent_amount','due_day','duration_months','readjustment_index','guarantor_name','guarantor_cpf','guarantor_phone','auto_renew','status','terms']) {
+    if ((args as any)[k] !== undefined) payload[k] = (args as any)[k];
+  }
+  if (!Object.keys(payload).length) return { error: 'nenhum campo informado' };
+  const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', args.tenantId).eq('status', 'active').limit(1).maybeSingle();
+  if (!ct) return { error: 'sem contrato ativo' };
+  const { error } = await s.from('contracts').update(payload).eq('id', ct.id);
+  if (error) return { error: error.message };
+  return { ok: true, updated: payload };
+}
+
+// Transfere titularidade: encerra inquilino atual no imóvel e cria novo no mesmo imóvel
+async function transferTitularity(args: { fromTenantId: string; newName: string; newPhone?: string; newCpf?: string; rent_amount?: number; due_day?: number; start_date?: string; house_number?: string }) {
+  const s = sb();
+  const { data: from } = await s.from('tenants').select('*, properties(name)').eq('id', args.fromTenantId).maybeSingle();
+  if (!from) return { error: 'inquilino atual não encontrado' };
+  const propertyId = from.property_id;
+  const startDate = args.start_date ?? today();
+  // arquivar antigo
+  await s.from('former_tenants').insert({
+    name: from.name, property_id: propertyId,
+    phone: from.phone, email: from.email, cpf: from.cpf, house_number: from.house_number,
+    start_date: from.start_date, exit_date: startDate, rent_amount: from.rent_amount, due_day: from.due_day,
+    notes: `Transferência de titularidade para ${args.newName}`,
+  });
+  await s.from('tenants').delete().eq('id', args.fromTenantId);
+  // criar novo
+  const rent = args.rent_amount ?? Number(from.rent_amount ?? 0);
+  const dueDay = args.due_day ?? Number(from.due_day ?? 10);
+  const { data: newT, error } = await s.from('tenants').insert({
+    name: args.newName, property_id: propertyId, phone: args.newPhone ?? null, cpf: args.newCpf ?? null,
+    house_number: args.house_number ?? from.house_number, rent_amount: rent, due_day: dueDay,
+    start_date: startDate, status: 'active',
+  }).select('id').single();
+  if (error) return { error: error.message };
+  // criar contrato
+  await s.from('contracts').insert({
+    tenant_id: newT.id, property_id: propertyId, start_date: startDate, rent_amount: rent, due_day: dueDay, status: 'active',
+  });
+  return { ok: true, new_tenant: args.newName, property: from.properties?.name, predecessor: from.name };
+}
+
+// Lista imóveis por proprietário
+async function listPropertiesByOwner(ownerQuery: string) {
+  const s = sb();
+  const q = norm(ownerQuery);
+  const { data } = await s.from('properties').select('id, name, address, owner_name, owner_phone, tenants(id, name, status)');
+  return (data ?? []).filter((p: any) => norm(p.owner_name ?? '').includes(q))
+    .map((p: any) => ({
+      name: p.name, address: p.address, owner: p.owner_name,
+      active_tenants: (p.tenants ?? []).filter((x: any) => x.status === 'active').map((x: any) => x.name),
+    }));
 }
 
 async function endTenancy(args: { tenantId: string; endDate?: string; notes?: string }) {
@@ -142,8 +276,8 @@ async function endTenancy(args: { tenantId: string; endDate?: string; notes?: st
   if (!t) return { error: 'inquilino não encontrado' };
   const endDate = args.endDate ?? today();
   await s.from('former_tenants').insert({
-    name: t.name, property_name: t.properties?.name ?? 'Desconhecido', phone: t.phone, email: t.email, cpf: t.cpf,
-    start_date: t.start_date, end_date: endDate, rent_amount: t.rent_amount, notes: args.notes ?? t.notes,
+    name: t.name, property_id: t.property_id, phone: t.phone, email: t.email, cpf: t.cpf, house_number: t.house_number,
+    start_date: t.start_date, exit_date: endDate, rent_amount: t.rent_amount, due_day: t.due_day, notes: args.notes ?? t.notes,
   });
   await s.from('tenants').delete().eq('id', args.tenantId);
   return { ok: true, name: t.name, end_date: endDate };
@@ -209,14 +343,20 @@ async function draftMessage(args: { tenantId: string; type: 'friendly_charge' | 
 
 // ============== TOOL REGISTRY ==============
 const TOOLS = [
-  { name: 'search_tenants', description: 'Buscar inquilinos por nome ou telefone (parcial).', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, fn: (a: any) => searchTenants(a.query) },
+  { name: 'search_tenants', description: 'Busca INTELIGENTE de inquilinos: por nome (mesmo parcial, sem acento), telefone, CPF, número da casa, nome do imóvel, endereço, OU nome do proprietário. Use sempre antes de dizer que não encontrou alguém.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, fn: (a: any) => smartFindTenants(a.query) },
+  { name: 'search_properties', description: 'Busca imóveis por nome, endereço, proprietário ou nome de inquilino atual.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, fn: (a: any) => smartFindProperties(a.query) },
+  { name: 'list_properties_by_owner', description: 'Lista todos os imóveis de um proprietário.', parameters: { type: 'object', properties: { owner: { type: 'string' } }, required: ['owner'] }, fn: (a: any) => listPropertiesByOwner(a.owner) },
   { name: 'list_active_tenants', description: 'Listar todos os inquilinos ativos.', parameters: { type: 'object', properties: {} }, fn: () => listActiveTenants() },
   { name: 'get_tenant_summary', description: 'Resumo completo do inquilino: dados, meses em aberto, últimos pagamentos.', parameters: { type: 'object', properties: { tenantId: { type: 'string' } }, required: ['tenantId'] }, fn: (a: any) => getTenantSummary(a.tenantId) },
   { name: 'list_overdue', description: 'Lista inquilinos com pagamentos em atraso (inadimplentes).', parameters: { type: 'object', properties: {} }, fn: () => listOverdue() },
   { name: 'list_paid_this_month', description: 'Lista pagamentos recebidos no mês atual.', parameters: { type: 'object', properties: {} }, fn: () => listPaidThisMonth() },
   { name: 'list_vacant_properties', description: 'Lista imóveis vazios (sem inquilino ativo).', parameters: { type: 'object', properties: {} }, fn: () => listVacantProperties() },
   { name: 'list_contracts_ending', description: 'Contratos vencendo nos próximos N dias (default 60).', parameters: { type: 'object', properties: { days: { type: 'number' } } }, fn: (a: any) => listContractsEnding(a.days ?? 60) },
-  { name: 'register_payment', description: 'Marca pagamento como pago. Se year/month omitidos, usa mês em aberto mais antigo. paidDate default hoje (YYYY-MM-DD).', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, year: { type: 'number' }, month: { type: 'number' }, paidDate: { type: 'string' } }, required: ['tenantId'] }, fn: (a: any) => registerPayment(a) },
+  { name: 'register_payment', description: 'Marca COMPETÊNCIA (year+month) como paga. paidDate é a DATA em que foi pago (pode ser mês diferente — ex: abril pago em maio). Se year/month omitidos, usa mês em aberto mais antigo. amount opcional (default = valor do aluguel).', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, year: { type: 'number' }, month: { type: 'number' }, paidDate: { type: 'string' }, amount: { type: 'number' } }, required: ['tenantId'] }, fn: (a: any) => registerPayment(a) },
+  { name: 'unmark_payment', description: 'Desfaz pagamento errado: volta o mês para pendente. Use quando o usuário disser que um mês foi marcado por engano.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, year: { type: 'number' }, month: { type: 'number' } }, required: ['tenantId','year','month'] }, fn: (a: any) => unmarkPayment(a) },
+  { name: 'update_tenant', description: 'Atualiza dados do inquilino (nome, telefone, cpf, house_number, rent_amount, due_day, pix_payer, email, notes). Se rent_amount mudar, propaga para contrato ativo e pagamentos pendentes.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, name: { type: 'string' }, phone: { type: 'string' }, cpf: { type: 'string' }, house_number: { type: 'string' }, rent_amount: { type: 'number' }, due_day: { type: 'number' }, pix_payer: { type: 'string' }, email: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId'] }, fn: (a: any) => updateTenant(a) },
+  { name: 'update_contract', description: 'Atualiza contrato ativo: datas, valor, vencimento, índice, fiador, status.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, start_date: { type: 'string' }, end_date: { type: 'string' }, rent_amount: { type: 'number' }, due_day: { type: 'number' }, duration_months: { type: 'number' }, readjustment_index: { type: 'string' }, guarantor_name: { type: 'string' }, guarantor_cpf: { type: 'string' }, guarantor_phone: { type: 'string' }, auto_renew: { type: 'boolean' }, status: { type: 'string' }, terms: { type: 'string' } }, required: ['tenantId'] }, fn: (a: any) => updateContract(a) },
+  { name: 'transfer_titularity', description: 'Transfere titularidade do imóvel: arquiva inquilino atual em ex-inquilinos e cria novo no mesmo imóvel com novo contrato. Use para "troca o nome do contrato para X", "agora quem mora é X", "passa para o nome do X".', parameters: { type: 'object', properties: { fromTenantId: { type: 'string' }, newName: { type: 'string' }, newPhone: { type: 'string' }, newCpf: { type: 'string' }, rent_amount: { type: 'number' }, due_day: { type: 'number' }, start_date: { type: 'string' }, house_number: { type: 'string' } }, required: ['fromTenantId','newName'] }, fn: (a: any) => transferTitularity(a) },
   { name: 'end_tenancy', description: 'Encerra contrato — move para ex-inquilinos. endDate default hoje.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, endDate: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId'] }, fn: (a: any) => endTenancy(a) },
   { name: 'create_charge', description: 'Cria nova cobrança avulsa para um inquilino.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, dueDate: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'dueDate'] }, fn: (a: any) => createCharge(a) },
   { name: 'issue_receipt', description: 'Registra recibo no histórico. referenceMonth no formato YYYY-MM.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, referenceMonth: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'referenceMonth'] }, fn: (a: any) => issueReceipt(a) },
@@ -226,23 +366,41 @@ const TOOLS = [
 const TOOL_MAP = Object.fromEntries(TOOLS.map(t => [t.name, t.fn]));
 const OAI_TOOLS = TOOLS.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } }));
 
-const SYSTEM = `Você é o ASSISTENTE OPERACIONAL da Mesquita Administração de Imóveis. Você gerencia inquilinos, imóveis, contratos, pagamentos, recibos e cobranças via conversa natural em português brasileiro.
+const SYSTEM = `Você é a ADMINISTRADORA IMOBILIÁRIA DIGITAL da Mesquita. Aja como uma secretária experiente que conhece todos os inquilinos, imóveis, proprietários e contratos. Você EXECUTA ações reais no banco de dados — não é só um chatbot.
 
-REGRAS:
-- Sempre que possível, EXECUTE a ação usando as ferramentas. Não apenas explique.
-- Para encontrar um inquilino, use 'search_tenants' com parte do nome. Se houver 1 resultado claro, prossiga. Se houver múltiplos, pergunte ao usuário qual.
-- Para "fulano pagou": chame 'register_payment' apenas com tenantId — o sistema escolhe o mês em aberto mais antigo automaticamente.
-- Se o usuário citar um mês explícito ("pagou outubro"), passe year + month.
-- Aluguel pode ser antecipado: se usuário diz "pagou dezembro hoje" mas só há novembro em aberto, ainda assim aplique como dezembro se ele especificou.
-- Confirme APENAS ações destrutivas (encerrar contrato, excluir dados). Pagamentos simples podem ser registrados direto.
-- Datas: use YYYY-MM-DD. Hoje é ${today()}.
-- Após executar, responda de forma curta confirmando o que foi feito (ex: "✓ Maria — outubro/2025 marcado como pago").
-- Para perguntas ("quem deve?", "imóveis vazios?"), use a ferramenta apropriada e responda com lista clara em markdown.
-- Para mensagens de WhatsApp, use 'draft_message' e devolva o link clicável.
-- Valores em reais: use vírgula (R$ 1.500,00).
-- NUNCA exiba IDs (UUID) ao usuário. Use apenas nome do inquilino, imóvel, valor e mês.
-- Em listas, agrupe e resuma. Se houver muitos itens, mostre os 10 mais críticos e ofereça filtrar.
-- Seja direto, prático e amigável. Não invente dados.`;
+REGRA DE OURO: ANTES de dizer "não encontrei" você DEVE chamar search_tenants e/ou search_properties com termos parciais. A busca é inteligente: aceita nome parcial, sem acento, telefone, endereço, número da casa, nome do imóvel OU nome do proprietário. Exemplo: "Rejane do Adones" → search_tenants("Rejane Adones") encontra a Rejane que mora no imóvel cujo proprietário se chama Adones.
+
+MEMÓRIA DE CONVERSA: o histórico completo é enviado. NUNCA pergunte de novo algo que o usuário já disse. Se ele identificou "Adones da Gabriel Gomes" antes, lembre disso nas próximas mensagens.
+
+EXECUTE — NÃO PERGUNTE:
+- Se a busca retornar 1 candidato claro, AJA direto. Sem confirmar.
+- Só peça desambiguação quando houver 2+ candidatos plausíveis com o mesmo score.
+- Só confirme antes ações destrutivas reais: excluir inquilino sem arquivar, encerrar contrato.
+- Alterações simples (telefone, valor, recibo, marcar pagamento, desmarcar pagamento, transferir titularidade) — execute direto e relate o resultado.
+
+PAGAMENTOS — COMPETÊNCIA vs DATA DE PAGAMENTO:
+- "Pagou em maio referente a abril" → register_payment(year=ano, month=4, paidDate=primeiro dia de maio do mesmo ano). NÃO marque maio.
+- "Pagou hoje" sem mês → register_payment sem year/month (pega mês em aberto mais antigo automaticamente).
+- "Pagou outubro" → register_payment(year=ano, month=10, paidDate=hoje).
+- "Ele só pagou abril, desmarca o resto" → para cada mês indevido, chame unmark_payment.
+- "Pagou R$ 800 em vez do valor cheio" → passe amount.
+
+TRANSFERÊNCIA DE TITULARIDADE:
+- Frases como "passa para Joaquim", "troca o nome para X", "agora quem mora é X", "transfere o contrato para X", "coloca no nome dele" → use transfer_titularity. Mantém o mesmo imóvel, arquiva o antigo em ex-inquilinos, cria novo inquilino + contrato. Mantém valor e vencimento se o usuário não informar.
+
+ALTERAÇÕES:
+- "Altera o telefone do Pedro para 11999..." → search_tenants("Pedro") + update_tenant.
+- "O aluguel do João virou 1500" → update_tenant(rent_amount=1500). Isso propaga para contrato + pagamentos pendentes.
+- "O vencimento agora é dia 5" → update_tenant(due_day=5).
+- Alterações contratuais (datas, fiador, índice, status) → update_contract.
+
+DATAS: YYYY-MM-DD. Hoje é ${today()}.
+VALORES: R$ 1.500,00 (vírgula decimal).
+NUNCA exiba UUIDs.
+APÓS executar: resposta curta confirmando ("✓ Rejane — abril/2025 marcado como pago (registrado em 12/05/2025).").
+Para listas, use markdown enxuto. Para WhatsApp, use draft_message e devolva o link clicável.
+
+Seja resoluta, prática e direta. NÃO invente dados — sempre consulte com as ferramentas.`;
 
 // ============== MAIN HANDLER ==============
 Deno.serve(async (req) => {

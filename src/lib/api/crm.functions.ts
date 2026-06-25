@@ -512,7 +512,7 @@ export const upsertExpense = async (data: { id?: string; description: string; am
 // ---------- RECEIPTS ----------
 export const listReceipts = async (data: { tenantId?: string } = {}) => {
   const s = await admin();
-  let q = s.from("receipts_history").select("*, tenants(name)").order("issued_at", { ascending: false });
+  let q = s.from("receipts_history").select("*, tenants(id, name, cpf, phone, house_number, pix_payer, properties(id, name, address))").order("issued_at", { ascending: false });
   if (data.tenantId) q = q.eq("tenant_id", data.tenantId);
   const { data: rows } = await q;
   return rows ?? [];
