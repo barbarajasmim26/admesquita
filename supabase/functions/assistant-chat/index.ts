@@ -236,9 +236,10 @@ async function transferTitularity(args: { fromTenantId: string; newName: string;
   const startDate = args.start_date ?? today();
   // arquivar antigo
   await s.from('former_tenants').insert({
-    name: from.name, property_id: propertyId, property_name: from.properties?.name ?? 'Desconhecido',
-    phone: from.phone, email: from.email, cpf: from.cpf, start_date: from.start_date,
-    end_date: startDate, rent_amount: from.rent_amount, notes: `Transferência de titularidade para ${args.newName}`,
+    name: from.name, property_id: propertyId,
+    phone: from.phone, email: from.email, cpf: from.cpf, house_number: from.house_number,
+    start_date: from.start_date, exit_date: startDate, rent_amount: from.rent_amount, due_day: from.due_day,
+    notes: `Transferência de titularidade para ${args.newName}`,
   });
   await s.from('tenants').delete().eq('id', args.fromTenantId);
   // criar novo
@@ -275,8 +276,8 @@ async function endTenancy(args: { tenantId: string; endDate?: string; notes?: st
   if (!t) return { error: 'inquilino não encontrado' };
   const endDate = args.endDate ?? today();
   await s.from('former_tenants').insert({
-    name: t.name, property_name: t.properties?.name ?? 'Desconhecido', phone: t.phone, email: t.email, cpf: t.cpf,
-    start_date: t.start_date, end_date: endDate, rent_amount: t.rent_amount, notes: args.notes ?? t.notes,
+    name: t.name, property_id: t.property_id, phone: t.phone, email: t.email, cpf: t.cpf, house_number: t.house_number,
+    start_date: t.start_date, exit_date: endDate, rent_amount: t.rent_amount, due_day: t.due_day, notes: args.notes ?? t.notes,
   });
   await s.from('tenants').delete().eq('id', args.tenantId);
   return { ok: true, name: t.name, end_date: endDate };
