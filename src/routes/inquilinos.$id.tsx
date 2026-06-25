@@ -19,8 +19,6 @@ import { downloadReceipt } from "@/lib/receipt-pdf";
 import { toast } from "sonner";
 import { MonthlyPaymentGrid } from "@/components/MonthlyPaymentGrid";
 import { chargeMessage, receiptMessage, waLink } from "@/lib/bot-templates";
-import { useServerFn } from "@/lib/rpc";
-import { getPaymentForReceipt } from "@/lib/api/crm.functions";
 
 const opts = (id: string) => queryOptions({ queryKey: ["tenant", id], queryFn: () => getTenant({ id }) });
 
@@ -39,7 +37,6 @@ function Page() {
   const [chargeOpen, setChargeOpen] = useState(false);
   const [payOpen, setPayOpen] = useState<any>(null);
   const [endOpen, setEndOpen] = useState(false);
-  const fetchPayment = useServerFn(getPaymentForReceipt);
   const t: any = data.tenant;
   if (!t) return <div className="p-8">Inquilino não encontrado</div>;
 
@@ -180,21 +177,18 @@ function Page() {
                       ? <Button size="sm" onClick={() => setPayOpen({ ...p, tenants: { ...t, properties: t.properties } })}><CheckCircle2 className="size-4 mr-1" />Pagar</Button>
                       : <Button size="sm" variant="outline" onClick={async () => {
                           try {
-                            const full: any = await fetchPayment({ data: { paymentId: p.id } });
-                            const tenant: any = full.tenants;
-                            const property: any = tenant?.properties;
-                            const due = new Date(full.due_date + "T12:00:00");
+                            const due = new Date(p.due_date + "T12:00:00");
                             await downloadReceipt({
-                              tenantName: tenant?.name ?? "",
-                              tenantCpf: tenant?.cpf ?? null,
-                              amount: Number(full.paid_amount ?? full.amount ?? 0),
-                              propertyName: property?.name ?? "",
-                              propertyAddress: property?.address ?? null,
-                              houseNumber: tenant?.house_number ?? null,
+                              tenantName: t?.name ?? "",
+                              tenantCpf: t?.cpf ?? null,
+                              amount: Number(p.paid_amount ?? p.amount ?? 0),
+                              propertyName: t?.properties?.name ?? "",
+                              propertyAddress: t?.properties?.address ?? null,
+                              houseNumber: t?.house_number ?? null,
                               referenceMonth: due.getMonth() + 1,
                               referenceYear: due.getFullYear(),
-                              issueDate: full.paid_date ? new Date(full.paid_date + "T12:00:00") : new Date(),
-                            }, `recibo_${(tenant?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
+                              issueDate: p.paid_date ? new Date(p.paid_date + "T12:00:00") : new Date(),
+                            }, `recibo_${(t?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
                           } catch (e: any) { toast.error(e.message ?? "Erro ao baixar recibo"); }
                         }}><FileDown className="size-4 mr-1" />Recibo</Button>}
                   </TableCell>
