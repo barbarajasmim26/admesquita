@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
-import { listProperties, listOverdueByTenant } from "@/lib/api/crm.functions";
+import { listProperties, listOverdueByTenant, listPayments } from "@/lib/api/crm.functions";
 import { PageHeader } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { brl } from "@/lib/finance";
 import { TenantDialog } from "@/components/TenantDialog";
-import { Plus, Building2, Phone, Home, LayoutGrid, List } from "lucide-react";
+import { Plus, Building2, Phone, Home, LayoutGrid, List, FileDown } from "lucide-react";
+import { downloadReceipt } from "@/lib/receipt-pdf";
+import { toast } from "sonner";
 
 const opts = queryOptions({ queryKey: ["properties"], queryFn: () => listProperties() });
 const overdueOpts = queryOptions({ queryKey: ["overdue-by-tenant"], queryFn: () => listOverdueByTenant() });
+const allPaymentsOpts = queryOptions({ queryKey: ["all-payments"], queryFn: () => listPayments({ data: { status: "paid" } }) });
 
 export const Route = createFileRoute("/inquilinos/")({
   head: () => ({ meta: [{ title: "Inquilinos — Mesquita Imóveis" }] }),
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(opts);
     context.queryClient.ensureQueryData(overdueOpts);
+    context.queryClient.ensureQueryData(allPaymentsOpts);
   },
   errorComponent: ({ error }) => <div className="p-8">{String(error)}</div>,
   notFoundComponent: () => <div className="p-8">Não encontrado</div>,
@@ -28,6 +32,7 @@ export const Route = createFileRoute("/inquilinos/")({
 function Page() {
   const { data } = useSuspenseQuery(opts);
   const { data: overdueList } = useSuspenseQuery(overdueOpts);
+  const { data: allPayments } = useSuspenseQuery(allPaymentsOpts);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"cards" | "byProperty">("cards");
@@ -37,6 +42,17 @@ function Page() {
     (overdueList as any[]).forEach((o) => m.set(o.tenant.id, { count: o.count, total: o.total }));
     return m;
   }, [overdueList]);
+
+  const lastPaymentMap = useMemo(() => {
+    const m = new Map<string, any>();
+    (allPayments as any[]).forEach((p) => {
+      const existing = m.get(p.tenant_id);
+      if (!existing || p.paid_date > existing.paid_date) {
+        m.set(p.tenant_id, p);
+      }
+    });
+    return m;
+  }, [allPayments]);
 
   const allTenants = useMemo(() => {
     const list: any[] = [];
@@ -64,6 +80,34 @@ function Page() {
       .filter((p: any) => p.name.toLowerCase().includes(term) || p.tenants.length > 0);
   }, [data, q]);
 
+  async function downloadLastReceipt(t: any, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const p = lastPaymentMap.get(t.id);
+    if (!p) {
+      toast.error("Nenhum pagamento pago encontrado para este inquilino.");
+      return;
+    }
+
+    try {
+      const due = new Date(p.due_date + "T12:00:00");
+      await downloadReceipt({
+        tenantName: t.name ?? "",
+        tenantCpf: t.cpf ?? null,
+        amount: Number(p.paid_amount ?? p.amount ?? 0),
+        propertyName: t.property?.name ?? "",
+        propertyAddress: t.property?.address ?? null,
+        houseNumber: t.house_number ?? null,
+        referenceMonth: due.getMonth() + 1,
+        referenceYear: due.getFullYear(),
+        issueDate: p.paid_date ? new Date(p.paid_date + "T12:00:00") : new Date(),
+      }, `recibo_${(t.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
+      toast.success("Recibo baixado!");
+    } catch (err: any) {
+      toast.error(err.message ?? "Erro ao baixar recibo");
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Inquilinos" description={`${totalTenants} inquilino(s) em ${data.length} imóvel(eis)`}
@@ -88,6 +132,7 @@ function Page() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredCards.map((t: any) => {
                 const overdue = overdueMap.get(t.id);
+                const hasPaid = lastPaymentMap.has(t.id);
                 const initials = t.name.split(/\s+/).slice(0, 2).map((s: string) => s[0]).join("").toUpperCase();
                 return (
                   <Link key={t.id} to="/inquilinos/$id" params={{ id: t.id }}>
@@ -118,12 +163,19 @@ function Page() {
                             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Aluguel</div>
                             <div className="font-semibold">{brl(t.rent_amount)}</div>
                           </div>
-                          {overdue && (
-                            <div className="text-right">
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Devendo</div>
-                              <div className="font-semibold text-destructive">{brl(overdue.total)}</div>
-                            </div>
-                          )}
+                          <div className="flex gap-1">
+                            {hasPaid && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600" onClick={(e) => downloadLastReceipt(t, e)} title="Baixar último recibo">
+                                <FileDown className="size-4" />
+                              </Button>
+                            )}
+                            {overdue && (
+                              <div className="text-right">
+                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Devendo</div>
+                                <div className="font-semibold text-destructive">{brl(overdue.total)}</div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -148,18 +200,28 @@ function Page() {
                     <p className="text-sm text-muted-foreground italic">Imóvel vago.</p>
                   ) : (
                     <div className="divide-y">
-                      {p.tenants.map((t: any) => (
-                        <Link key={t.id} to="/inquilinos/$id" params={{ id: t.id }} className="flex items-center justify-between gap-3 py-2 hover:bg-muted/30 -mx-2 px-2 rounded">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm text-primary hover:underline truncate">{t.name}</div>
-                            <div className="text-xs text-muted-foreground">{t.house_number ? `casa ${t.house_number} · ` : ""}{t.phone ?? "sem telefone"}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium">{brl(t.rent_amount)}</div>
-                            <div className="text-xs text-muted-foreground">aluguel</div>
-                          </div>
-                        </Link>
-                      ))}
+                      {p.tenants.map((t: any) => {
+                        const hasPaid = lastPaymentMap.has(t.id);
+                        return (
+                          <Link key={t.id} to="/inquilinos/$id" params={{ id: t.id }} className="flex items-center justify-between gap-3 py-2 hover:bg-muted/30 -mx-2 px-2 rounded">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-primary hover:underline truncate">{t.name}</div>
+                              <div className="text-xs text-muted-foreground">{t.house_number ? `casa ${t.house_number} · ` : ""}{t.phone ?? "sem telefone"}</div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              {hasPaid && (
+                                <Button variant="ghost" size="sm" className="h-8 px-2 text-emerald-600 gap-1" onClick={(e) => downloadLastReceipt({ ...t, property: p }, e)}>
+                                  <FileDown className="size-4" /> <span className="text-[10px]">Recibo</span>
+                                </Button>
+                              )}
+                              <div className="text-right min-w-[80px]">
+                                <div className="text-sm font-medium">{brl(t.rent_amount)}</div>
+                                <div className="text-xs text-muted-foreground">aluguel</div>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
