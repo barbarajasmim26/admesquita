@@ -1,14 +1,16 @@
 // @ts-nocheck
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { getFormerTenant } from "@/lib/api/crm.functions";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useSuspenseQuery, queryOptions, useQueryClient } from "@tanstack/react-query";
+import { getFormerTenant, reactivateTenant } from "@/lib/api/crm.functions";
 import { PageHeader } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle, UserPlus } from "lucide-react";
 import { brl, formatDateBR } from "@/lib/finance";
+import { useServerFn } from "@/lib/rpc";
+import { toast } from "sonner";
 
-const opts = (id: string) => queryOptions({ queryKey: ["former", id], queryFn: () => getFormerTenant({ data: { id } }) });
+const opts = (id: string) => queryOptions({ queryKey: ["former", id], queryFn: () => getFormerTenant({ id }) });
 
 export const Route = createFileRoute("/ex-inquilinos/$id")({
   head: () => ({ meta: [{ title: "Ex-inquilino — Mesquita Imóveis" }] }),
@@ -30,9 +32,24 @@ function Row({ label, value }: { label: string; value: any }) {
 function Page() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(opts(id));
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const reactivate = useServerFn(reactivateTenant);
+  
   const t: any = data.tenant;
   if (!t) return <div className="p-8">Ex-inquilino não encontrado</div>;
   const phone = (t.phone ?? "").replace(/\D/g, "");
+
+  async function handleReactivate() {
+    try {
+      await reactivate({ data: { id: t.tenant_id || id } });
+      toast.success("Inquilino reativado com sucesso!");
+      qc.invalidateQueries();
+      nav({ to: "/inquilinos" });
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao reativar");
+    }
+  }
 
   return (
     <div>
@@ -42,6 +59,9 @@ function Page() {
         actions={
           <div className="flex gap-2">
             <Button asChild variant="outline" size="sm"><Link to="/ex-inquilinos"><ArrowLeft className="size-4 mr-1" />Voltar</Link></Button>
+            <Button size="sm" onClick={handleReactivate} className="bg-emerald-600 hover:bg-emerald-700">
+              <UserPlus className="size-4 mr-1" />Reativar Inquilino
+            </Button>
             {phone && (
               <Button asChild variant="outline" size="sm">
                 <a href={`https://wa.me/55${phone}`} target="_blank" rel="noreferrer"><MessageCircle className="size-4 mr-1" />WhatsApp</a>

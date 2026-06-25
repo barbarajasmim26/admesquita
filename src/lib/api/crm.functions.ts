@@ -290,12 +290,12 @@ export const upsertTenant = async (data: {
       email: data.email || null,
       cpf: data.cpf || null,
       house_number: data.houseNumber || null,
-      rent_amount: data.rentAmount,
-      due_day: data.dueDay,
+      rent_amount: data.rent_amount,
+      due_day: data.due_day,
       deposit: data.deposit ?? 0,
       start_date: data.startDate,
       late_fee_percent: data.lateFeePercent ?? 2,
-      interest_percent: data.interestPercent ?? 1,
+      interest_percent: data.interest_percent ?? 1,
       notes: data.notes || null,
       pix_payer: data.pixPayer || null,
       status: "active",
@@ -310,15 +310,54 @@ export const upsertTenant = async (data: {
     // Auto-create active contract
     await s.from("contracts").insert({
       tenant_id: row.id, property_id: data.propertyId,
-      rent_amount: data.rentAmount, due_day: data.dueDay, start_date: data.startDate, status: "active",
+      rent_amount: data.rent_amount, due_day: data.due_day, start_date: data.startDate, status: "active",
     });
     return { ok: true, id: row.id };
   };
 
-export const deactivateTenant = async (data: { id: string }) => {
+export const deactivateTenant = async (data: { id: string; exitDate?: string; notes?: string }) => {
   const s = await admin();
+  const { data: t } = await s.from("tenants").select("*").eq("id", data.id).single();
+  if (!t) throw new Error("Inquilino não encontrado");
+  
+  // Move to former_tenants table
+  await s.from("former_tenants").insert({
+    name: t.name,
+    property_id: t.property_id,
+    house_number: t.house_number,
+    phone: t.phone,
+    email: t.email,
+    cpf: t.cpf,
+    start_date: t.start_date,
+    exit_date: data.exitDate || today(),
+    rent_amount: t.rent_amount,
+    deposit: t.deposit,
+    due_day: t.due_day,
+    notes: data.notes || t.notes,
+  });
+
   await s.from("tenants").update({ status: "inactive" }).eq("id", data.id);
   await s.from("contracts").update({ status: "ended" }).eq("tenant_id", data.id).eq("status", "active");
+  return { ok: true };
+};
+
+export const reactivateTenant = async (data: { id: string }) => {
+  const s = await admin();
+  // We re-activate the tenant row
+  await s.from("tenants").update({ status: "active" }).eq("id", data.id);
+  
+  // Re-activate or create a new contract
+  const { data: t } = await s.from("tenants").select("*").eq("id", data.id).single();
+  if (t) {
+    await s.from("contracts").insert({
+      tenant_id: t.id, property_id: t.property_id,
+      rent_amount: t.rent_amount, due_day: t.due_day, start_date: today(), status: "active",
+    });
+  }
+  
+  // Delete from former_tenants if exists
+  await s.from("former_tenants").delete().eq("name", t.name).eq("property_id", t.property_id);
+  
   return { ok: true };
 };
 
@@ -343,12 +382,13 @@ export const getProperty = async (data: { id: string }) => {
     .select("*, tenants(*)")
     .eq("id", data.id)
     .maybeSingle();
-  const propName = (p as any)?.name ?? "";
+  
   const { data: former } = await s
     .from("former_tenants")
     .select("*")
-    .eq("property_name", propName)
-    .order("end_date", { ascending: false });
+    .eq("property_id", data.id)
+    .order("exit_date", { ascending: false });
+    
   const tenants = ((p as any)?.tenants ?? []).filter((t: any) => t.status === "active");
   const formerTenants = former ?? [];
   return { property: p, tenants, formerTenants };
@@ -375,123 +415,30 @@ export const listContracts = async () => {
 // ---------- EX-INQUILINOS / FORMER ----------
 export const listFormerTenants = async () => {
   const s = await admin();
-  const { data } = await s.from("former_tenants").select("*").order("end_date", { ascending: false });
+  const { data } = await s.from("former_tenants").select("*, properties(id, name, address)").order("exit_date", { ascending: false });
   return data ?? [];
 };
 
 export const getFormerTenant = async (data: { id: string }) => {
   const s = await admin();
-  const { data: t } = await s.from("former_tenants").select("*").eq("id", data.id).single();
-  return t;
+  const { data: t } = await s.from("former_tenants").select("*, properties(id, name, address)").eq("id", data.id).single();
+  return { tenant: t };
 };
 
 export const endTenancy = async (data: { tenantId: string; endDate: string; notes?: string }) => {
-  const s = await admin();
-  const { data: t } = await s.from("tenants").select("*, properties(name)").eq("id", data.tenantId).single();
-  if (!t) throw new Error("Inquilino não encontrado");
-  await s.from("former_tenants").insert({
-    name: t.name, property_name: t.properties?.name || "Desconhecido",
-    phone: t.phone, email: t.email, cpf: t.cpf, start_date: t.start_date,
-    end_date: data.endDate, rent_amount: t.rent_amount, notes: data.notes || t.notes,
-  });
-  await s.from("tenants").delete().eq("id", data.tenantId);
-  return { ok: true };
-};
-
-// ---------- ALERTS ----------
-export const listAlerts = async () => {
-  const s = await admin();
-  const { data } = await s.from("alerts").select("*").order("created_at", { ascending: false });
-  return data ?? [];
-};
-
-export const dismissAlert = async (data: { id: string }) => {
-  const s = await admin();
-  await s.from("alerts").delete().eq("id", data.id);
-  return { ok: true };
-};
-
-// ---------- CALENDARIO ----------
-export const listMonthPayments = async (data: { year: number; month: number }) => {
-  const s = await admin();
-  const mm = String(data.month).padStart(2, "0");
-  const start = `${data.year}-${mm}-01`;
-  const lastDay = new Date(data.year, data.month, 0).getDate();
-  const end = `${data.year}-${mm}-${String(lastDay).padStart(2, "0")}`;
-  const { data: rows } = await s.from("payments").select("id, amount, due_date, status, tenant_id").gte("due_date", start).lte("due_date", end);
-  return rows ?? [];
-};
-
-// ---------- CRM / LEADS ----------
-export const listLeads = async () => {
-  const s = await admin();
-  const { data } = await s.from("leads").select("*").order("created_at", { ascending: false });
-  return data ?? [];
-};
-
-export const upsertLead = async (data: { id?: string; name: string; phone?: string; email?: string; status?: string; notes?: string; source?: string }) => {
-  const s = await admin();
-  const payload = { name: data.name, phone: data.phone, email: data.email, status: data.status || "new", notes: data.notes, source: data.source };
-  if (data.id) {
-    await s.from("leads").update(payload).eq("id", data.id);
-    return { ok: true, id: data.id };
-  }
-  const { data: row } = await s.from("leads").insert(payload).select("id").single();
-  return { ok: true, id: row?.id };
-};
-
-export const updateLeadStatus = async (data: { id: string; status: string }) => {
-  const s = await admin();
-  await s.from("leads").update({ status: data.status }).eq("id", data.id);
-  return { ok: true };
-};
-
-export const deleteLead = async (data: { id: string }) => {
-  const s = await admin();
-  await s.from("leads").delete().eq("id", data.id);
-  return { ok: true };
-};
-
-// ---------- TASKS ----------
-export const listTasks = async (data: { tenantId?: string } = {}) => {
-  const s = await admin();
-  let q = s.from("tasks").select("*, tenants(name)").order("due_date", { ascending: true });
-  if (data.tenantId) q = q.eq("tenant_id", data.tenantId);
-  const { data: rows } = await q;
-  return rows ?? [];
-};
-
-export const upsertTask = async (data: { id?: string; title: string; description?: string; dueDate?: string; priority?: string; tenantId?: string }) => {
-  const s = await admin();
-  const payload = { title: data.title, description: data.description, due_date: data.dueDate, priority: data.priority || "medium", tenant_id: data.tenantId };
-  if (data.id) {
-    await s.from("tasks").update(payload).eq("id", data.id);
-    return { ok: true, id: data.id };
-  }
-  const { data: row } = await s.from("tasks").insert(payload).select("id").single();
-  return { ok: true, id: row?.id };
-};
-
-export const toggleTaskStatus = async (data: { id: string; completed: boolean }) => {
-  const s = await admin();
-  await s.from("tasks").update({ status: data.completed ? "completed" : "pending" }).eq("id", data.id);
-  return { ok: true };
-};
-
-export const deleteTask = async (data: { id: string }) => {
-  const s = await admin();
-  await s.from("tasks").delete().eq("id", data.id);
-  return { ok: true };
+  return deactivateTenant({ id: data.tenantId, exitDate: data.endDate, notes: data.notes });
 };
 
 // ---------- EXPENSES ----------
-export const listExpenses = async (data: { month?: string } = {}) => {
+export const listExpenses = async (data: { month?: string; propertyId?: string } = {}) => {
   const s = await admin();
-  let q = s.from("expenses").select("*").order("date", { ascending: false });
+  let q = s.from("expenses").select("*, properties(id, name)").order("date", { ascending: false });
+  if (data.propertyId) q = q.eq("property_id", data.propertyId);
   if (data.month) {
     const [y, m] = data.month.split("-").map(Number);
     const start = `${y}-${String(m).padStart(2, "0")}-01`;
-    const end = `${y}-${String(m).padStart(2, "0")}-31`;
+    const last = new Date(y, m, 0).getDate();
+    const end = `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
     q = q.gte("date", start).lte("date", end);
   }
   const { data: rows } = await q;
