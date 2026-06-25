@@ -129,7 +129,6 @@ function Page() {
         referenceYear: y,
         issueDate: r.issued_at ? new Date(r.issued_at) : new Date(),
         pixPayer: t.pix_payer ?? null,
-        receiptNumber: r.receipt_number,
       }, `recibo_${r.receipt_number?.replace(/\//g, "-")}_${(t.name ?? "").replace(/\s+/g, "_")}.pdf`);
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao baixar");
