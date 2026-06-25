@@ -415,14 +415,40 @@ export const listContracts = async () => {
 // ---------- EX-INQUILINOS / FORMER ----------
 export const listFormerTenants = async () => {
   const s = await admin();
-  const { data } = await s.from("former_tenants").select("*, properties(id, name, address)").order("exit_date", { ascending: false });
-  return data ?? [];
+  // 1. Get explicit former tenants
+  const { data: former } = await s.from("former_tenants").select("*, properties(id, name, address)").order("exit_date", { ascending: false });
+  
+  // 2. Get inactive tenants that are not in former_tenants yet
+  const { data: inactive } = await s.from("tenants").select("*, properties(id, name, address)").eq("status", "inactive");
+  
+  const formerList = former ?? [];
+  const inactiveList = (inactive ?? []).map(t => ({
+    ...t,
+    exit_date: t.updated_at || t.start_date, // fallback
+    is_legacy_inactive: true
+  }));
+
+  // Merge and avoid duplicates by name+property
+  const merged = [...formerList];
+  inactiveList.forEach(t => {
+    const exists = merged.some(f => f.name === t.name && f.property_id === t.property_id);
+    if (!exists) merged.push(t);
+  });
+
+  return merged.sort((a, b) => (b.exit_date || "").localeCompare(a.exit_date || ""));
 };
 
 export const getFormerTenant = async (data: { id: string }) => {
   const s = await admin();
-  const { data: t } = await s.from("former_tenants").select("*, properties(id, name, address)").eq("id", data.id).single();
-  return { tenant: t };
+  // Try former_tenants first
+  const { data: f } = await s.from("former_tenants").select("*, properties(id, name, address)").eq("id", data.id).maybeSingle();
+  if (f) return { tenant: f };
+
+  // Try inactive tenants
+  const { data: t } = await s.from("tenants").select("*, properties(id, name, address)").eq("id", data.id).eq("status", "inactive").maybeSingle();
+  if (t) return { tenant: { ...t, exit_date: t.updated_at } };
+
+  throw new Error("Inquilino não encontrado");
 };
 
 export const endTenancy = async (data: { tenantId: string; endDate: string; notes?: string }) => {
@@ -504,11 +530,60 @@ export const getFinancialReport = async (data: { year: number }) => {
 
 // ---------- ASSISTANT / BOT ----------
 export const getAssistantSuggestions = async () => {
-  // Mock or simple logic for suggestions
-  return [
-    { id: "1", title: "Cobranças atrasadas", description: "Existem 5 inquilinos com pagamentos atrasados há mais de 3 dias.", action: "Ver inadimplência", link: "/inadimplencia" },
-    { id: "2", title: "Contratos vencendo", description: "3 contratos vencem nos próximos 30 dias.", action: "Ver contratos", link: "/contratos" },
-  ];
+  const s = await admin();
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const in30 = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+
+  const [paymentsRes, contractsRes, propertiesRes] = await Promise.all([
+    s.from("payments").select("id, amount, due_date, status, tenant_id, tenants(name)").eq("status", "overdue"),
+    s.from("contracts").select("id, end_date, tenants(name)").eq("status", "active").lte("end_date", in30).gte("end_date", todayStr),
+    s.from("properties").select("id, name, tenants(id, status)"),
+  ]);
+
+  const suggestions: any[] = [];
+
+  // 1. Inadimplência
+  const overdue = paymentsRes.data ?? [];
+  if (overdue.length > 0) {
+    const total = overdue.reduce((a, p) => a + Number(p.amount), 0);
+    suggestions.push({
+      id: "overdue",
+      title: "Cobranças atrasadas",
+      description: `Existem ${overdue.length} cobranças em atraso totalizando ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(total)}.`,
+      action: "Ver inadimplência",
+      link: "/inadimplencia",
+      severity: "destructive"
+    });
+  }
+
+  // 2. Contratos vencendo
+  const contracts = contractsRes.data ?? [];
+  if (contracts.length > 0) {
+    suggestions.push({
+      id: "contracts",
+      title: "Contratos vencendo",
+      description: `${contracts.length} contrato(s) vencem nos próximos 30 dias.`,
+      action: "Ver contratos",
+      link: "/contratos",
+      severity: "warning"
+    });
+  }
+
+  // 3. Imóveis vagos
+  const vacant = (propertiesRes.data ?? []).filter((p: any) => !p.tenants || p.tenants.filter((t: any) => t.status === "active").length === 0);
+  if (vacant.length > 0) {
+    suggestions.push({
+      id: "vacant",
+      title: "Imóveis vagos",
+      description: `Você tem ${vacant.length} imóvel(eis) sem inquilinos ativos no momento.`,
+      action: "Ver imóveis",
+      link: "/imoveis",
+      severity: "info"
+    });
+  }
+
+  return suggestions;
 };
 
 // ---------- BOT SUGGESTIONS ----------
