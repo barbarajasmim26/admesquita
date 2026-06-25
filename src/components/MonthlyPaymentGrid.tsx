@@ -5,8 +5,9 @@ import { setMonthStatus } from "@/lib/api/crm.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { brl } from "@/lib/finance";
-import { ChevronLeft, ChevronRight, Check, Clock, AlertTriangle, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Clock, AlertTriangle, X, Download } from "lucide-react";
 import { toast } from "sonner";
+import { downloadReceipt } from "@/lib/receipt-pdf";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
@@ -27,11 +28,13 @@ export function MonthlyPaymentGrid({
   rentAmount,
   startDate,
   payments,
+  tenantData,
 }: {
   tenantId: string;
   rentAmount: number;
   startDate: string | null;
   payments: PaymentRow[];
+  tenantData?: any;
 }) {
   const qc = useQueryClient();
   const setStatus = useServerFn(setMonthStatus);
@@ -57,6 +60,27 @@ export function MonthlyPaymentGrid({
       qc.invalidateQueries();
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao atualizar");
+    }
+  }
+
+  async function downloadReceiptForMonth(payment: PaymentRow) {
+    try {
+      const tenant: any = tenantData || {};
+      const property: any = tenant?.properties;
+      const due = new Date(payment.due_date + "T12:00:00");
+      await downloadReceipt({
+        tenantName: tenant?.name ?? "",
+        tenantCpf: tenant?.cpf ?? null,
+        amount: Number(payment.paid_amount ?? payment.amount ?? 0),
+        propertyName: property?.name ?? "",
+        propertyAddress: property?.address ?? null,
+        houseNumber: tenant?.house_number ?? null,
+        referenceMonth: due.getMonth() + 1,
+        referenceYear: due.getFullYear(),
+        issueDate: payment.paid_date ? new Date(payment.paid_date + "T12:00:00") : new Date(),
+      }, `recibo_${(tenant?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao baixar recibo");
     }
   }
 
@@ -124,6 +148,11 @@ export function MonthlyPaymentGrid({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
+                  {p && p.status === "paid" && (
+                    <DropdownMenuItem onClick={() => downloadReceiptForMonth(p)}>
+                      <Download className="size-4 mr-2 text-blue-500" /> Baixar recibo
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => update(monthNum, "paid")}>
                     <Check className="size-4 mr-2 text-emerald-500" /> Marcar como pago
                   </DropdownMenuItem>

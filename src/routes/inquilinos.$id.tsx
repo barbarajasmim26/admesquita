@@ -150,6 +150,7 @@ function Page() {
               rentAmount={Number(t.rent_amount ?? 0)}
               startDate={t.start_date}
               payments={data.payments as any}
+              tenantData={t}
             />
           </CardContent>
           <Table>
