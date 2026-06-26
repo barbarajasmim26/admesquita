@@ -295,12 +295,12 @@ export const upsertTenant = async (data: {
       email: data.email || null,
       cpf: data.cpf || null,
       house_number: data.houseNumber || null,
-      rent_amount: data.rent_amount,
-      due_day: data.due_day,
+      rent_amount: data.rentAmount,
+      due_day: data.dueDay,
       deposit: data.deposit ?? 0,
       start_date: data.startDate,
       late_fee_percent: data.lateFeePercent ?? 2,
-      interest_percent: data.interest_percent ?? 1,
+      interest_percent: data.interestPercent ?? 1,
       notes: data.notes || null,
       pix_payer: data.pixPayer || null,
       status: "active",
@@ -315,7 +315,7 @@ export const upsertTenant = async (data: {
     // Auto-create active contract
     await s.from("contracts").insert({
       tenant_id: row.id, property_id: data.propertyId,
-      rent_amount: data.rent_amount, due_day: data.due_day, start_date: data.startDate, status: "active",
+      rent_amount: data.rentAmount, due_day: data.dueDay, start_date: data.startDate, status: "active",
     });
     return { ok: true, id: row.id };
   };
