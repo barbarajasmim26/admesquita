@@ -244,11 +244,13 @@ export const listOverdueByTenant = async () => {
   await syncOverdue();
   const s = await admin();
   const { data, error } = await s.from("payments").select(
-    "id, amount, due_date, status, tenant_id, tenants(id, name, phone, properties(name, address))"
+    "id, amount, due_date, status, tenant_id, tenants(id, name, phone, status, properties(name, address))"
   ).neq("status", "paid").lt("due_date", today()).limit(3000);
   if (error) throw error;
   const map = new Map<string, { tenant: any; total: number; count: number; oldest: string }>();
   (data ?? []).forEach((p: any) => {
+    // skip orphans and inactive tenants — those belong to ex-inquilinos
+    if (!p.tenants || p.tenants.status !== "active") return;
     const key = p.tenant_id;
     const cur = map.get(key) ?? { tenant: p.tenants, total: 0, count: 0, oldest: p.due_date };
     cur.total += Number(p.amount ?? 0);
