@@ -17,7 +17,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { formatDateBR } from "@/lib/finance";
 
-const opts = queryOptions({ queryKey: ["tasks"], queryFn: () => listTasks({ data: {} }) });
+const opts = queryOptions({ queryKey: ["tasks"], queryFn: () => listTasks({}) });
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({ meta: [{ title: "Agenda — Mesquita Imóveis" }] }),
