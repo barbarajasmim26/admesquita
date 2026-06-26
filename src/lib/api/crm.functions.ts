@@ -27,11 +27,12 @@ export const getDashboard = async () => {
   const [propsRes, tenantsRes, paymentsRes, formerRes, contractsRes] = await Promise.all([
     s.from("properties").select("id, category"),
     s.from("tenants").select("id,status"),
-    s.from("payments").select("id,amount,paid_amount,status,due_date,paid_date,tenant_id").limit(5000),
+    s.from("payments").select("id,amount,paid_amount,status,due_date,paid_date,tenant_id,tenants(status)").limit(5000),
     s.from("former_tenants").select("id"),
     s.from("contracts").select("id, end_date, status, tenants(name)").eq("status", "active"),
   ]);
-  const payments = paymentsRes.data ?? [];
+  // Ignore payments belonging to inactive/former tenants for live KPIs
+  const payments = (paymentsRes.data ?? []).filter((p: any) => !p.tenants || p.tenants.status === "active");
   const now = new Date();
   const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const thisMonth = ym(now);
@@ -52,7 +53,7 @@ export const getDashboard = async () => {
   const in30 = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
   const contractsEndingSoon = (contractsRes.data ?? []).filter((c: any) => c.end_date && c.end_date <= in30 && c.end_date >= today());
   const condominios = (propsRes.data ?? []).filter((p: any) => p.category === "condominio").length;
-  const overdueTenantIds = new Set(payments.filter(p => p.status !== "paid" && p.due_date < today()).map((p: any) => p.tenant_id));
+  const overdueTenantIds = new Set(payments.filter((p: any) => p.status !== "paid" && p.due_date < today()).map((p: any) => p.tenant_id));
 
   const revenueByMonth: { month: string; total: number }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -64,12 +65,14 @@ export const getDashboard = async () => {
     revenueByMonth.push({ month: d.toLocaleDateString("pt-BR", { month: "short" }), total });
   }
 
+  const inactiveCountRes = await s.from("tenants").select("id", { count: "exact", head: true }).eq("status", "inactive");
+  const formerTotal = (formerRes.data?.length ?? 0) + (inactiveCountRes.count ?? 0);
   return {
     properties: propsRes.data?.length ?? 0,
     condominios,
     activeTenants: tenantsRes.data?.filter(t => t.status === "active").length ?? 0,
     overdueTenants: overdueTenantIds.size,
-    formerTenants: formerRes.data?.length ?? 0,
+    formerTenants: formerTotal,
     receitaMes,
     previstoMes,
     inadimplencia,
@@ -241,11 +244,13 @@ export const listOverdueByTenant = async () => {
   await syncOverdue();
   const s = await admin();
   const { data, error } = await s.from("payments").select(
-    "id, amount, due_date, status, tenant_id, tenants(id, name, phone, properties(name, address))"
+    "id, amount, due_date, status, tenant_id, tenants(id, name, phone, status, properties(name, address))"
   ).neq("status", "paid").lt("due_date", today()).limit(3000);
   if (error) throw error;
   const map = new Map<string, { tenant: any; total: number; count: number; oldest: string }>();
   (data ?? []).forEach((p: any) => {
+    // skip orphans and inactive tenants — those belong to ex-inquilinos
+    if (!p.tenants || p.tenants.status !== "active") return;
     const key = p.tenant_id;
     const cur = map.get(key) ?? { tenant: p.tenants, total: 0, count: 0, oldest: p.due_date };
     cur.total += Number(p.amount ?? 0);
@@ -290,12 +295,12 @@ export const upsertTenant = async (data: {
       email: data.email || null,
       cpf: data.cpf || null,
       house_number: data.houseNumber || null,
-      rent_amount: data.rent_amount,
-      due_day: data.due_day,
+      rent_amount: data.rentAmount,
+      due_day: data.dueDay,
       deposit: data.deposit ?? 0,
       start_date: data.startDate,
       late_fee_percent: data.lateFeePercent ?? 2,
-      interest_percent: data.interest_percent ?? 1,
+      interest_percent: data.interestPercent ?? 1,
       notes: data.notes || null,
       pix_payer: data.pixPayer || null,
       status: "active",
@@ -310,7 +315,7 @@ export const upsertTenant = async (data: {
     // Auto-create active contract
     await s.from("contracts").insert({
       tenant_id: row.id, property_id: data.propertyId,
-      rent_amount: data.rent_amount, due_day: data.due_day, start_date: data.startDate, status: "active",
+      rent_amount: data.rentAmount, due_day: data.dueDay, start_date: data.startDate, status: "active",
     });
     return { ok: true, id: row.id };
   };
@@ -661,4 +666,168 @@ export const getReports = async () => {
     cashflow,
     occupancyByProperty,
   };
+};
+
+// ---------- TASKS / AGENDA ----------
+export const listTasks = async (data: { status?: string } = {}) => {
+  const s = await admin();
+  let q = s.from("tasks").select("*, tenants(id,name), leads(id,name), properties(id,name)").order("due_date", { ascending: true });
+  if (data?.status) q = q.eq("status", data.status);
+  const { data: rows, error } = await q.limit(500);
+  if (error) throw error;
+  return rows ?? [];
+};
+
+export const upsertTask = async (data: {
+  id?: string; title: string; description?: string; dueDate: string; dueTime?: string;
+  priority?: string; tenantId?: string; leadId?: string; propertyId?: string;
+}) => {
+  const s = await admin();
+  const payload: any = {
+    title: data.title,
+    description: data.description || null,
+    due_date: data.dueDate,
+    due_time: data.dueTime || null,
+    priority: data.priority || "normal",
+    tenant_id: data.tenantId || null,
+    lead_id: data.leadId || null,
+    property_id: data.propertyId || null,
+  };
+  if (data.id) {
+    const { error } = await s.from("tasks").update(payload).eq("id", data.id);
+    if (error) throw error;
+    return { ok: true, id: data.id };
+  }
+  payload.status = "pending";
+  const { data: row, error } = await s.from("tasks").insert(payload).select("id").single();
+  if (error) throw error;
+  return { ok: true, id: row.id };
+};
+
+export const toggleTaskStatus = async (data: { id: string; status: string }) => {
+  const s = await admin();
+  const patch: any = { status: data.status };
+  if (data.status === "done") patch.completed_at = new Date().toISOString();
+  else patch.completed_at = null;
+  const { error } = await s.from("tasks").update(patch).eq("id", data.id);
+  if (error) throw error;
+  return { ok: true };
+};
+
+export const deleteTask = async (data: { id: string }) => {
+  const s = await admin();
+  const { error } = await s.from("tasks").delete().eq("id", data.id);
+  if (error) throw error;
+  return { ok: true };
+};
+
+// ---------- LEADS / CRM ----------
+export const listLeads = async () => {
+  const s = await admin();
+  const { data, error } = await s.from("leads").select("*, properties(id,name)").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+};
+
+export const upsertLead = async (data: {
+  id?: string; name: string; phone?: string; email?: string; source?: string;
+  interest?: string; budget?: number; propertyId?: string; status?: string; notes?: string;
+}) => {
+  const s = await admin();
+  const payload: any = {
+    name: data.name,
+    phone: data.phone || null,
+    email: data.email || null,
+    source: data.source || null,
+    interest: data.interest || null,
+    budget: data.budget ?? null,
+    property_id: data.propertyId || null,
+    status: data.status || "novo",
+    notes: data.notes || null,
+  };
+  if (data.id) {
+    const { error } = await s.from("leads").update(payload).eq("id", data.id);
+    if (error) throw error;
+    return { ok: true, id: data.id };
+  }
+  const { data: row, error } = await s.from("leads").insert(payload).select("id").single();
+  if (error) throw error;
+  return { ok: true, id: row.id };
+};
+
+export const updateLeadStatus = async (data: { id: string; status: string }) => {
+  const s = await admin();
+  const { error } = await s.from("leads").update({ status: data.status }).eq("id", data.id);
+  if (error) throw error;
+  return { ok: true };
+};
+
+export const deleteLead = async (data: { id: string }) => {
+  const s = await admin();
+  const { error } = await s.from("leads").delete().eq("id", data.id);
+  if (error) throw error;
+  return { ok: true };
+};
+
+// ---------- ALERTS ----------
+export const listAlerts = async () => {
+  await syncOverdue();
+  const s = await admin();
+  // Pull saved alerts
+  const { data: stored } = await s.from("alerts").select("*").order("created_at", { ascending: false }).limit(50);
+
+  // Build derived live alerts: overdue payments + contracts ending
+  const todayStr = today();
+  const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const [overdueRes, endingRes] = await Promise.all([
+    s.from("payments").select("id, amount, due_date, tenant_id, tenants(name, status)")
+      .neq("status", "paid").lt("due_date", todayStr).limit(200),
+    s.from("contracts").select("id, end_date, tenant_id, tenants(name, status)")
+      .eq("status", "active").gte("end_date", todayStr).lte("end_date", in30),
+  ]);
+
+  const live: any[] = [];
+  (overdueRes.data ?? []).forEach((p: any) => {
+    if (!p.tenants || p.tenants.status !== "active") return;
+    live.push({
+      id: `ov-${p.id}`,
+      type: "overdue",
+      title: `Aluguel atrasado — ${p.tenants.name}`,
+      message: `Vencido em ${new Date(p.due_date + "T12:00:00").toLocaleDateString("pt-BR")} · R$ ${Number(p.amount).toFixed(2)}`,
+      date: p.due_date,
+      tenant_id: p.tenant_id,
+      tenant_name: p.tenants.name,
+      payment_id: p.id,
+    });
+  });
+  (endingRes.data ?? []).forEach((c: any) => {
+    if (!c.tenants || c.tenants.status !== "active") return;
+    live.push({
+      id: `end-${c.id}`,
+      type: "expiring",
+      title: `Contrato vencendo — ${c.tenants.name}`,
+      message: `Vence em ${new Date(c.end_date + "T12:00:00").toLocaleDateString("pt-BR")}`,
+      date: c.end_date,
+      tenant_id: c.tenant_id,
+      tenant_name: c.tenants.name,
+    });
+  });
+
+  const all = [...(stored ?? []), ...live];
+  return all.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+};
+
+// ---------- CALENDARIO ----------
+export const listMonthPayments = async (data: { year: number; month: number }) => {
+  await syncOverdue();
+  const s = await admin();
+  const mm = String(data.month).padStart(2, "0");
+  const start = `${data.year}-${mm}-01`;
+  const last = new Date(data.year, data.month, 0).getDate();
+  const end = `${data.year}-${mm}-${String(last).padStart(2, "0")}`;
+  const { data: rows, error } = await s.from("payments")
+    .select("id, amount, due_date, status, tenants(name, status, properties(name))")
+    .gte("due_date", start).lte("due_date", end).limit(2000);
+  if (error) throw error;
+  return (rows ?? []).filter((p: any) => !p.tenants || p.tenants.status === "active");
 };

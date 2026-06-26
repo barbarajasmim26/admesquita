@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { brl, formatDateBR } from "@/lib/finance";
 import { StatusBadge } from "@/components/StatusBadge";
 
-const opts = (y: number, m: number) => queryOptions({ queryKey: ["cal", y, m], queryFn: () => listMonthPayments({ data: { year: y, month: m } }) });
+const opts = (y: number, m: number) => queryOptions({ queryKey: ["cal", y, m], queryFn: () => listMonthPayments({ year: y, month: m }) });
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const DIAS = ["D","S","T","Q","Q","S","S"];
 

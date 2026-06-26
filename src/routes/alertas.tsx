@@ -34,7 +34,7 @@ function Page() {
 
   async function openPay(paymentId: string) {
     try {
-      const full: any = await getPaymentForReceipt({ data: { paymentId } });
+      const full: any = await getPaymentForReceipt({ paymentId });
       setPayOpen(full);
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao carregar cobrança");
