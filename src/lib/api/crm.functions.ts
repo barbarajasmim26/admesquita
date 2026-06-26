@@ -27,11 +27,12 @@ export const getDashboard = async () => {
   const [propsRes, tenantsRes, paymentsRes, formerRes, contractsRes] = await Promise.all([
     s.from("properties").select("id, category"),
     s.from("tenants").select("id,status"),
-    s.from("payments").select("id,amount,paid_amount,status,due_date,paid_date,tenant_id").limit(5000),
+    s.from("payments").select("id,amount,paid_amount,status,due_date,paid_date,tenant_id,tenants(status)").limit(5000),
     s.from("former_tenants").select("id"),
     s.from("contracts").select("id, end_date, status, tenants(name)").eq("status", "active"),
   ]);
-  const payments = paymentsRes.data ?? [];
+  // Ignore payments belonging to inactive/former tenants for live KPIs
+  const payments = (paymentsRes.data ?? []).filter((p: any) => !p.tenants || p.tenants.status === "active");
   const now = new Date();
   const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const thisMonth = ym(now);
@@ -52,7 +53,7 @@ export const getDashboard = async () => {
   const in30 = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
   const contractsEndingSoon = (contractsRes.data ?? []).filter((c: any) => c.end_date && c.end_date <= in30 && c.end_date >= today());
   const condominios = (propsRes.data ?? []).filter((p: any) => p.category === "condominio").length;
-  const overdueTenantIds = new Set(payments.filter(p => p.status !== "paid" && p.due_date < today()).map((p: any) => p.tenant_id));
+  const overdueTenantIds = new Set(payments.filter((p: any) => p.status !== "paid" && p.due_date < today()).map((p: any) => p.tenant_id));
 
   const revenueByMonth: { month: string; total: number }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -64,12 +65,14 @@ export const getDashboard = async () => {
     revenueByMonth.push({ month: d.toLocaleDateString("pt-BR", { month: "short" }), total });
   }
 
+  const inactiveCountRes = await s.from("tenants").select("id", { count: "exact", head: true }).eq("status", "inactive");
+  const formerTotal = (formerRes.data?.length ?? 0) + (inactiveCountRes.count ?? 0);
   return {
     properties: propsRes.data?.length ?? 0,
     condominios,
     activeTenants: tenantsRes.data?.filter(t => t.status === "active").length ?? 0,
     overdueTenants: overdueTenantIds.size,
-    formerTenants: formerRes.data?.length ?? 0,
+    formerTenants: formerTotal,
     receitaMes,
     previstoMes,
     inadimplencia,
