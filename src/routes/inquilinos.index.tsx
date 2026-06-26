@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 const opts = queryOptions({ queryKey: ["properties"], queryFn: () => listProperties() });
 const overdueOpts = queryOptions({ queryKey: ["overdue-by-tenant"], queryFn: () => listOverdueByTenant() });
-const allPaymentsOpts = queryOptions({ queryKey: ["all-payments"], queryFn: () => listPayments({ data: { status: "paid" } }) });
+const allPaymentsOpts = queryOptions({ queryKey: ["all-payments"], queryFn: () => listPayments({ status: "paid" }) });
 
 export const Route = createFileRoute("/inquilinos/")({
   head: () => ({ meta: [{ title: "Inquilinos — Mesquita Imóveis" }] }),
