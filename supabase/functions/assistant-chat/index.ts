@@ -341,6 +341,60 @@ async function draftMessage(args: { tenantId: string; type: 'friendly_charge' | 
   return { message: msg, whatsapp_link: link, tenant: t.name };
 }
 
+// Prepara payload para o cliente gerar PDF de contrato (cópia de contrato existente com overrides).
+// Retorna objeto ContractData compatível com src/lib/contract-pdf.ts.
+async function prepareContractCopy(args: {
+  tenantId?: string;
+  contractId?: string;
+  overrides?: Partial<{
+    tenantName: string; tenantNationality: string; tenantMaritalStatus: string; tenantProfession: string;
+    tenantRg: string; tenantCpf: string; tenantAddress: string;
+    propertyAddress: string;
+    rentAmount: number; depositAmount: number; dueDay: number;
+    startDate: string; endDate: string; signDate: string;
+    durationYears: number; readjustmentIndex: string;
+  }>;
+}) {
+  const s = sb();
+  let contract: any = null;
+  if (args.contractId) {
+    const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('id', args.contractId).maybeSingle();
+    contract = data;
+  } else if (args.tenantId) {
+    const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('tenant_id', args.tenantId).order('start_date', { ascending: false }).limit(1).maybeSingle();
+    contract = data;
+  }
+  if (!contract) return { error: 'contrato não encontrado' };
+  const t = contract.tenants ?? {};
+  const p = contract.properties ?? {};
+  const o = args.overrides ?? {};
+  const startDate = o.startDate ?? contract.start_date ?? today();
+  const endDate = o.endDate ?? contract.end_date ?? (() => {
+    const d = new Date(startDate); d.setFullYear(d.getFullYear() + (o.durationYears ?? 3)); return d.toISOString().slice(0,10);
+  })();
+  const propertyAddress = o.propertyAddress ?? [p.address, t.house_number ? `casa ${t.house_number}` : null].filter(Boolean).join(', ') ?? '';
+  const rent = Number(o.rentAmount ?? contract.rent_amount ?? t.rent_amount ?? 0);
+  const data = {
+    tenantName: o.tenantName ?? t.name ?? '',
+    tenantNationality: o.tenantNationality ?? 'brasileiro(a)',
+    tenantMaritalStatus: o.tenantMaritalStatus,
+    tenantProfession: o.tenantProfession,
+    tenantRg: o.tenantRg,
+    tenantCpf: o.tenantCpf ?? t.cpf ?? undefined,
+    tenantAddress: o.tenantAddress ?? propertyAddress,
+    propertyAddress,
+    durationYears: o.durationYears ?? 3,
+    startDate, endDate,
+    rentAmount: rent,
+    depositAmount: Number(o.depositAmount ?? rent),
+    dueDay: Number(o.dueDay ?? contract.due_day ?? t.due_day ?? 10),
+    readjustmentIndex: o.readjustmentIndex ?? contract.readjustment_index ?? 'IGP-M',
+    signDate: o.signDate ?? today(),
+  };
+  const filename = `contrato-${(data.tenantName || 'novo').toString().toLowerCase().replace(/[^a-z0-9]+/g,'-')}.pdf`;
+  return { __action: 'download_contract_pdf', filename, contractData: data, source_tenant: t.name };
+}
+
 // ============== TOOL REGISTRY ==============
 const TOOLS = [
   { name: 'search_tenants', description: 'Busca INTELIGENTE de inquilinos: por nome (mesmo parcial, sem acento), telefone, CPF, número da casa, nome do imóvel, endereço, OU nome do proprietário. Use sempre antes de dizer que não encontrou alguém.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, fn: (a: any) => smartFindTenants(a.query) },
