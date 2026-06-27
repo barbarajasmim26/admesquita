@@ -449,6 +449,10 @@ ALTERAÇÕES:
 - "O vencimento agora é dia 5" → update_tenant(due_day=5).
 - Alterações contratuais (datas, fiador, índice, status) → update_contract.
 
+CÓPIA DE CONTRATO (PDF):
+- "Preciso de um contrato igual o do Adones mudando o nome para Joaquim e o valor para 1200" → search_tenants("Adones") + prepare_contract_copy(tenantId=<adones>, overrides={tenantName:"Joaquim", rentAmount:1200}).
+- O sistema NÃO altera o contrato original — só gera um PDF para download. Avise: "PDF pronto, clique no botão Baixar contrato abaixo."
+
 DATAS: YYYY-MM-DD. Hoje é ${today()}.
 VALORES: R$ 1.500,00 (vírgula decimal).
 NUNCA exiba UUIDs.
