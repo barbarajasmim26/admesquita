@@ -10,13 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Bot, Send, Loader2, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { downloadContract, type ContractData } from "@/lib/contract-pdf";
+import { Download } from "lucide-react";
 
 export const Route = createFileRoute("/assistente")({
   head: () => ({ meta: [{ title: "Assistente — Mesquita Imóveis" }] }),
   component: Page,
 });
 
-type Msg = { role: "user" | "assistant"; content: string };
+type ToolTrace = { name: string; args: any; result: any };
+type Msg = { role: "user" | "assistant"; content: string; toolTrace?: ToolTrace[] };
 const STORAGE_KEY = "mesquita.assistant.messages.v1";
 
 const QUICK_PROMPTS = [
@@ -58,7 +61,8 @@ function Page() {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       const reply = (data as any)?.reply ?? "(sem resposta)";
-      setMessages([...next, { role: "assistant", content: reply }]);
+      const trace: ToolTrace[] = (data as any)?.toolTrace ?? [];
+      setMessages([...next, { role: "assistant", content: reply, toolTrace: trace }]);
       qc.invalidateQueries();
     } catch (e: any) {
       toast.error(e.message ?? "Erro");
@@ -161,6 +165,9 @@ function Page() {
 
 function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";
+  const downloads = (msg.toolTrace ?? [])
+    .map(t => t.result)
+    .filter(r => r && r.__action === "download_contract_pdf" && r.contractData);
   return (
     <div className={`flex gap-3 max-w-3xl ${isUser ? "ml-auto flex-row-reverse" : ""}`}>
       <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}>
@@ -171,9 +178,27 @@ function Bubble({ msg }: { msg: Msg }) {
           {isUser ? (
             <div className="whitespace-pre-wrap">{msg.content}</div>
           ) : (
-            <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-headings:my-2">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
-            </div>
+            <>
+              <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-headings:my-2">
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              </div>
+              {downloads.map((d: any, i: number) => (
+                <Button key={i} size="sm" variant="outline" className="mt-2 gap-2"
+                  onClick={async () => {
+                    try {
+                      const cd: ContractData = {
+                        ...d.contractData,
+                        startDate: new Date(d.contractData.startDate),
+                        endDate: new Date(d.contractData.endDate),
+                        signDate: d.contractData.signDate ? new Date(d.contractData.signDate) : undefined,
+                      };
+                      await downloadContract(cd, d.filename ?? "contrato.pdf");
+                    } catch (e: any) { toast.error(e.message ?? "erro ao gerar PDF"); }
+                  }}>
+                  <Download className="size-4" /> Baixar contrato (PDF)
+                </Button>
+              ))}
+            </>
           )}
         </CardContent>
       </Card>
