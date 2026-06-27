@@ -341,6 +341,60 @@ async function draftMessage(args: { tenantId: string; type: 'friendly_charge' | 
   return { message: msg, whatsapp_link: link, tenant: t.name };
 }
 
+// Prepara payload para o cliente gerar PDF de contrato (cópia de contrato existente com overrides).
+// Retorna objeto ContractData compatível com src/lib/contract-pdf.ts.
+async function prepareContractCopy(args: {
+  tenantId?: string;
+  contractId?: string;
+  overrides?: Partial<{
+    tenantName: string; tenantNationality: string; tenantMaritalStatus: string; tenantProfession: string;
+    tenantRg: string; tenantCpf: string; tenantAddress: string;
+    propertyAddress: string;
+    rentAmount: number; depositAmount: number; dueDay: number;
+    startDate: string; endDate: string; signDate: string;
+    durationYears: number; readjustmentIndex: string;
+  }>;
+}) {
+  const s = sb();
+  let contract: any = null;
+  if (args.contractId) {
+    const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('id', args.contractId).maybeSingle();
+    contract = data;
+  } else if (args.tenantId) {
+    const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('tenant_id', args.tenantId).order('start_date', { ascending: false }).limit(1).maybeSingle();
+    contract = data;
+  }
+  if (!contract) return { error: 'contrato não encontrado' };
+  const t = contract.tenants ?? {};
+  const p = contract.properties ?? {};
+  const o = args.overrides ?? {};
+  const startDate = o.startDate ?? contract.start_date ?? today();
+  const endDate = o.endDate ?? contract.end_date ?? (() => {
+    const d = new Date(startDate); d.setFullYear(d.getFullYear() + (o.durationYears ?? 3)); return d.toISOString().slice(0,10);
+  })();
+  const propertyAddress = o.propertyAddress ?? [p.address, t.house_number ? `casa ${t.house_number}` : null].filter(Boolean).join(', ') ?? '';
+  const rent = Number(o.rentAmount ?? contract.rent_amount ?? t.rent_amount ?? 0);
+  const data = {
+    tenantName: o.tenantName ?? t.name ?? '',
+    tenantNationality: o.tenantNationality ?? 'brasileiro(a)',
+    tenantMaritalStatus: o.tenantMaritalStatus,
+    tenantProfession: o.tenantProfession,
+    tenantRg: o.tenantRg,
+    tenantCpf: o.tenantCpf ?? t.cpf ?? undefined,
+    tenantAddress: o.tenantAddress ?? propertyAddress,
+    propertyAddress,
+    durationYears: o.durationYears ?? 3,
+    startDate, endDate,
+    rentAmount: rent,
+    depositAmount: Number(o.depositAmount ?? rent),
+    dueDay: Number(o.dueDay ?? contract.due_day ?? t.due_day ?? 10),
+    readjustmentIndex: o.readjustmentIndex ?? contract.readjustment_index ?? 'IGP-M',
+    signDate: o.signDate ?? today(),
+  };
+  const filename = `contrato-${(data.tenantName || 'novo').toString().toLowerCase().replace(/[^a-z0-9]+/g,'-')}.pdf`;
+  return { __action: 'download_contract_pdf', filename, contractData: data, source_tenant: t.name };
+}
+
 // ============== TOOL REGISTRY ==============
 const TOOLS = [
   { name: 'search_tenants', description: 'Busca INTELIGENTE de inquilinos: por nome (mesmo parcial, sem acento), telefone, CPF, número da casa, nome do imóvel, endereço, OU nome do proprietário. Use sempre antes de dizer que não encontrou alguém.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, fn: (a: any) => smartFindTenants(a.query) },
@@ -361,6 +415,7 @@ const TOOLS = [
   { name: 'create_charge', description: 'Cria nova cobrança avulsa para um inquilino.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, dueDate: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'dueDate'] }, fn: (a: any) => createCharge(a) },
   { name: 'issue_receipt', description: 'Registra recibo no histórico. referenceMonth no formato YYYY-MM.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, referenceMonth: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'referenceMonth'] }, fn: (a: any) => issueReceipt(a) },
   { name: 'draft_message', description: 'Gera mensagem profissional para WhatsApp + link wa.me. Tipos: friendly_charge, formal_charge, overdue, renewal, welcome, thanks.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, type: { type: 'string', enum: ['friendly_charge','formal_charge','overdue','renewal','welcome','thanks'] } }, required: ['tenantId', 'type'] }, fn: (a: any) => draftMessage(a) },
+  { name: 'prepare_contract_copy', description: 'Gera um PDF de contrato copiando um contrato existente (do tenantId ou contractId) e aplicando overrides (novo nome, novo valor, novo endereço, novas datas, etc.). NÃO altera o contrato original — apenas devolve um PDF para download. Use quando o usuário pedir "faz um contrato igual o do X mudando isso", "copia o contrato do Adones para Joaquim", "preciso de um contrato pro Y nos mesmos moldes do Z", etc.', parameters: { type: 'object', properties: { tenantId: { type: 'string', description: 'inquilino de origem (busca o contrato mais recente)' }, contractId: { type: 'string', description: 'id direto do contrato de origem (opcional)' }, overrides: { type: 'object', properties: { tenantName: { type: 'string' }, tenantNationality: { type: 'string' }, tenantMaritalStatus: { type: 'string' }, tenantProfession: { type: 'string' }, tenantRg: { type: 'string' }, tenantCpf: { type: 'string' }, tenantAddress: { type: 'string' }, propertyAddress: { type: 'string' }, rentAmount: { type: 'number' }, depositAmount: { type: 'number' }, dueDay: { type: 'number' }, startDate: { type: 'string' }, endDate: { type: 'string' }, signDate: { type: 'string' }, durationYears: { type: 'number' }, readjustmentIndex: { type: 'string' } } } } }, fn: (a: any) => prepareContractCopy(a) },
 ];
 
 const TOOL_MAP = Object.fromEntries(TOOLS.map(t => [t.name, t.fn]));
@@ -393,6 +448,10 @@ ALTERAÇÕES:
 - "O aluguel do João virou 1500" → update_tenant(rent_amount=1500). Isso propaga para contrato + pagamentos pendentes.
 - "O vencimento agora é dia 5" → update_tenant(due_day=5).
 - Alterações contratuais (datas, fiador, índice, status) → update_contract.
+
+CÓPIA DE CONTRATO (PDF):
+- "Preciso de um contrato igual o do Adones mudando o nome para Joaquim e o valor para 1200" → search_tenants("Adones") + prepare_contract_copy(tenantId=<adones>, overrides={tenantName:"Joaquim", rentAmount:1200}).
+- O sistema NÃO altera o contrato original — só gera um PDF para download. Avise: "PDF pronto, clique no botão Baixar contrato abaixo."
 
 DATAS: YYYY-MM-DD. Hoje é ${today()}.
 VALORES: R$ 1.500,00 (vírgula decimal).
