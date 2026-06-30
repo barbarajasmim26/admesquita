@@ -63,11 +63,12 @@ async function smartFindTenants(query: string) {
   const archived = (former ?? []).map((t: any) => ({ ...t, status: 'former', source: 'former_tenants', kind: 'former_tenant' }));
   const scored = [...current, ...archived].map((t: any) => {
     const hay = [t.name, t.phone, t.email, t.cpf, t.house_number, t.properties?.name, t.properties?.address, t.properties?.owner_name, t.properties?.owner_phone].filter(Boolean).join(' ');
-    let score = tokenScore(query, hay);
+    const baseScore = tokenScore(query, hay);
+    let score = baseScore;
     if (t.status === 'active') score += 8;
     if (t.status === 'former') score += 3;
-    return { t, score };
-  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 15);
+    return { t, score, baseScore };
+  }).filter(x => x.baseScore > 0).sort((a, b) => b.score - a.score).slice(0, 15);
   return scored.map(({ t, score }) => ({
     id: t.id, source: t.source, kind: t.kind,
     name: t.name, phone: t.phone, email: t.email, cpf: t.cpf,
