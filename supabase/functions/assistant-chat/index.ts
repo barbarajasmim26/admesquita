@@ -83,7 +83,6 @@ async function smartFindTenants(query: string) {
 
 async function smartFindProperties(query: string) {
   const s = sb();
-  const q = norm(query);
   const { data } = await s.from('properties').select('id, name, address, owner_name, owner_phone, category, tenants(id, name, status)').limit(2000);
   const scored = (data ?? []).map((p: any) => {
     const hay = [p.name, p.address, p.owner_name, p.owner_phone, ...(p.tenants ?? []).map((x: any) => x.name)].filter(Boolean).join(' ');
@@ -810,7 +809,7 @@ MEMÓRIA DE CONVERSA: o histórico completo é enviado. NUNCA pergunte de novo a
 
 EXECUTE — NÃO PERGUNTE:
 - Se a busca retornar 1 candidato claro, AJA direto. Sem confirmar.
-- Só peça desambiguação quando houver 2+ candidatos plausíveis com o mesmo score.
+- Só peça desambiguação quando houver 2+ candidatos plausíveis com score parecido. Se o primeiro resultado tiver score muito maior, use o primeiro mesmo que a busca liste outros resultados fracos.
 - Só confirme antes de apagar dados sem arquivar. Encerrar contrato/locação arquiva em ex-inquilinos e pode executar quando o usuário pedir claramente.
 - Alterações simples (telefone, valor, recibo, marcar/desmarcar pagamento, vencimento, dados de imóvel/proprietário, tarefa, lead, transferir titularidade) — execute direto e relate o resultado.
 
