@@ -14,6 +14,35 @@ const ymOf = (d: string) => d.slice(0, 7);
 const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n || 0);
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const norm = (s: string) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const digits = (s: string) => (s ?? '').toString().replace(/\D/g, '');
+
+function tokenScore(query: string, haystack: string) {
+  const q = norm(query);
+  const hay = norm(haystack);
+  if (!q || !hay) return 0;
+  let score = 0;
+  if (hay === q) score += 300;
+  if (hay.includes(q)) score += 140;
+  const qDigits = digits(query);
+  if (qDigits.length >= 4 && digits(haystack).includes(qDigits)) score += 180;
+  const qTokens = q.split(' ').filter(t => t.length >= 2);
+  const hayTokens = hay.split(' ').filter(Boolean);
+  for (const tk of qTokens) {
+    if (hayTokens.includes(tk)) score += 30;
+    else if (hayTokens.some(h => h.startsWith(tk) || tk.startsWith(h))) score += 16;
+    else if (hay.includes(tk)) score += 8;
+  }
+  return score;
+}
+
+function firstDayOfMonth(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+}
+
+function lastDayOfMonth(year: number, month: number) {
+  const d = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
 
 // ============== SMART SEARCH ==============
 // Busca AMPLA: por nome, telefone, endereço, imóvel, proprietário, número da casa.
@@ -22,24 +51,32 @@ async function smartFindTenants(query: string) {
   const s = sb();
   const q = norm(query);
   if (!q) return [];
-  const { data: tenants } = await s.from('tenants')
-    .select('id, name, phone, status, house_number, rent_amount, due_day, cpf, property_id, properties(id, name, address, owner_name, owner_phone)')
-    .limit(2000);
-  const tokens = q.split(' ').filter(t => t.length >= 2);
-  const scored = (tenants ?? []).map((t: any) => {
-    const hay = norm([t.name, t.phone, t.cpf, t.house_number, t.properties?.name, t.properties?.address, t.properties?.owner_name, t.properties?.owner_phone].filter(Boolean).join(' '));
-    let score = 0;
-    if (hay.includes(q)) score += 100;
-    for (const tk of tokens) if (hay.includes(tk)) score += 10;
-    // boost ativos
-    if (t.status === 'active') score += 2;
+  const [{ data: tenants }, { data: former }] = await Promise.all([
+    s.from('tenants')
+      .select('id, name, phone, email, status, house_number, rent_amount, due_day, cpf, property_id, start_date, properties(id, name, address, owner_name, owner_phone)')
+      .limit(4000),
+    s.from('former_tenants')
+      .select('id, name, phone, email, house_number, rent_amount, due_day, cpf, property_id, start_date, exit_date, properties(id, name, address, owner_name, owner_phone)')
+      .limit(4000),
+  ]);
+  const current = (tenants ?? []).map((t: any) => ({ ...t, source: 'tenants', kind: t.status === 'active' ? 'active_tenant' : 'inactive_tenant' }));
+  const archived = (former ?? []).map((t: any) => ({ ...t, status: 'former', source: 'former_tenants', kind: 'former_tenant' }));
+  const scored = [...current, ...archived].map((t: any) => {
+    const hay = [t.name, t.phone, t.email, t.cpf, t.house_number, t.properties?.name, t.properties?.address, t.properties?.owner_name, t.properties?.owner_phone].filter(Boolean).join(' ');
+    let score = tokenScore(query, hay);
+    if (t.status === 'active') score += 8;
+    if (t.status === 'former') score += 3;
     return { t, score };
-  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 15);
   return scored.map(({ t, score }) => ({
-    id: t.id, name: t.name, phone: t.phone, status: t.status, house_number: t.house_number,
+    id: t.id, source: t.source, kind: t.kind,
+    name: t.name, phone: t.phone, email: t.email, cpf: t.cpf,
+    status: t.status, house_number: t.house_number,
     rent: Number(t.rent_amount ?? 0), due_day: t.due_day,
+    property_id: t.property_id,
     property: t.properties?.name, address: t.properties?.address,
-    owner: t.properties?.owner_name, score,
+    owner: t.properties?.owner_name, owner_phone: t.properties?.owner_phone,
+    start_date: t.start_date, exit_date: t.exit_date, score,
   }));
 }
 
@@ -60,6 +97,24 @@ async function smartFindProperties(query: string) {
     category: p.category,
     active_tenants: (p.tenants ?? []).filter((x: any) => x.status === 'active').map((x: any) => x.name),
   }));
+}
+
+async function resolveTenant(queryOrId: string, preferActive = true) {
+  if (!queryOrId) return { error: 'informe o inquilino' };
+  if (/^[0-9a-f-]{36}$/i.test(queryOrId)) {
+    const s = sb();
+    const { data: t } = await s.from('tenants').select('id, name, status').eq('id', queryOrId).maybeSingle();
+    if (t) return { tenant: { ...t, source: 'tenants' } };
+    const { data: f } = await s.from('former_tenants').select('id, name').eq('id', queryOrId).maybeSingle();
+    if (f) return { tenant: { ...f, status: 'former', source: 'former_tenants' } };
+  }
+  const found = await smartFindTenants(queryOrId);
+  const ranked = preferActive ? [...found].sort((a: any, b: any) => (b.status === 'active' ? 10 : 0) + b.score - ((a.status === 'active' ? 10 : 0) + a.score)) : found;
+  if (!ranked.length) return { error: `não encontrei inquilino para "${queryOrId}"` };
+  if (ranked.length > 1 && ranked[0].score > 0 && Math.abs(ranked[0].score - ranked[1].score) <= 6) {
+    return { ambiguous: true, candidates: ranked.slice(0, 5) };
+  }
+  return { tenant: ranked[0] };
 }
 
 // ============== TOOLS ==============
