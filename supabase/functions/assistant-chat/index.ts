@@ -84,17 +84,14 @@ async function smartFindProperties(query: string) {
   const s = sb();
   const q = norm(query);
   const { data } = await s.from('properties').select('id, name, address, owner_name, owner_phone, category, tenants(id, name, status)').limit(2000);
-  const tokens = q.split(' ').filter(t => t.length >= 2);
   const scored = (data ?? []).map((p: any) => {
-    const hay = norm([p.name, p.address, p.owner_name, p.owner_phone, ...(p.tenants ?? []).map((x: any) => x.name)].filter(Boolean).join(' '));
-    let score = 0;
-    if (hay.includes(q)) score += 100;
-    for (const tk of tokens) if (hay.includes(tk)) score += 10;
+    const hay = [p.name, p.address, p.owner_name, p.owner_phone, ...(p.tenants ?? []).map((x: any) => x.name)].filter(Boolean).join(' ');
+    const score = tokenScore(query, hay);
     return { p, score };
   }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 15);
-  return scored.map(({ p }) => ({
+  return scored.map(({ p, score }) => ({
     id: p.id, name: p.name, address: p.address, owner: p.owner_name, owner_phone: p.owner_phone,
-    category: p.category,
+    category: p.category, score,
     active_tenants: (p.tenants ?? []).filter((x: any) => x.status === 'active').map((x: any) => x.name),
   }));
 }
@@ -115,6 +112,32 @@ async function resolveTenant(queryOrId: string, preferActive = true) {
     return { ambiguous: true, candidates: ranked.slice(0, 5) };
   }
   return { tenant: ranked[0] };
+}
+
+async function resolveProperty(queryOrId: string) {
+  if (!queryOrId) return { error: 'informe o imóvel' };
+  if (/^[0-9a-f-]{36}$/i.test(queryOrId)) {
+    const s = sb();
+    const { data: p } = await s.from('properties').select('id, name').eq('id', queryOrId).maybeSingle();
+    if (p) return { property: p };
+  }
+  const found = await smartFindProperties(queryOrId);
+  if (!found.length) return { error: `não encontrei imóvel para "${queryOrId}"` };
+  if (found.length > 1 && Math.abs(found[0].score - found[1].score) <= 6) return { ambiguous: true, candidates: found.slice(0, 5) };
+  return { property: found[0] };
+}
+
+function csvEscape(value: any) {
+  const s = value === null || value === undefined ? '' : String(value);
+  return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCsv(rows: any[]) {
+  const headers = Array.from(rows.reduce((set: Set<string>, row: any) => {
+    Object.keys(row ?? {}).forEach(k => set.add(k));
+    return set;
+  }, new Set<string>()));
+  return [headers.join(';'), ...rows.map(row => headers.map(h => csvEscape(row?.[h])).join(';'))].join('\n');
 }
 
 // ============== TOOLS ==============
