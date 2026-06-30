@@ -7,12 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Bot, Send, Loader2, Trash2, User } from "lucide-react";
+import { Bot, Send, Loader2, Trash2, User, Download } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { downloadReceipt, type ReceiptData } from "@/lib/receipt-pdf";
 import { downloadContract, type ContractData } from "@/lib/contract-pdf";
-import { Download } from "lucide-react";
 
 export const Route = createFileRoute("/assistente")({
   head: () => ({ meta: [{ title: "Assistente — Mesquita Imóveis" }] }),
@@ -27,8 +26,20 @@ const QUICK_PROMPTS = [
   "Quem está inadimplente?",
   "Quais imóveis estão vazios?",
   "Contratos vencendo nos próximos 60 dias",
-  "Quem pagou esse mês?",
+  "Baixar lista de inquilinos em CSV",
 ];
+
+function downloadTextFile(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 function Page() {
   const qc = useQueryClient();
@@ -166,9 +177,9 @@ function Page() {
 
 function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";
-  const downloads = (msg.toolTrace ?? [])
+  const actions = (msg.toolTrace ?? [])
     .map(t => t.result)
-    .filter(r => r && r.__action === "download_contract_pdf" || r.__action === "download_receipt_pdf");
+    .filter(r => r && typeof r.__action === "string");
   return (
     <div className={`flex gap-3 max-w-3xl ${isUser ? "ml-auto flex-row-reverse" : ""}`}>
       <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}>
@@ -183,33 +194,53 @@ function Bubble({ msg }: { msg: Msg }) {
               <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-headings:my-2">
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
               </div>
-              {downloads.filter((d: any) => d.__action === "download_receipt_pdf").map((d: any, i: number) => (
-                <Button key={`receipt-${i}`} size="sm" variant="outline" className="mt-2 gap-2"
-                  onClick={async () => {
-                    try {
-                      await downloadReceipt(d.receiptData, d.filename ?? "recibo.pdf");
-                    } catch (e: any) { toast.error(e.message ?? "erro ao gerar PDF"); }
-                  }}>
-                  <Download className="size-4" /> Baixar recibo (PDF)
-                </Button>
-              ))}
-
-              {downloads.filter((d: any) => d.__action === "download_contract_pdf").map((d: any, i: number) => (
-                <Button key={i} size="sm" variant="outline" className="mt-2 gap-2"
-                  onClick={async () => {
-                    try {
-                      const cd: ContractData = {
-                        ...d.contractData,
-                        startDate: new Date(d.contractData.startDate),
-                        endDate: new Date(d.contractData.endDate),
-                        signDate: d.contractData.signDate ? new Date(d.contractData.signDate) : undefined,
-                      };
-                      await downloadContract(cd, d.filename ?? "contrato.pdf");
-                    } catch (e: any) { toast.error(e.message ?? "erro ao gerar PDF"); }
-                  }}>
-                  <Download className="size-4" /> Baixar contrato (PDF)
-                </Button>
-              ))}
+              <div className="flex flex-wrap gap-2 mt-2">
+                {actions.map((d: any, i: number) => {
+                  if (d.__action === "download_receipt_pdf" && d.receiptData) {
+                    return (
+                      <Button key={`receipt-${i}`} size="sm" variant="outline" className="gap-2"
+                        onClick={async () => {
+                          try {
+                            const rd: ReceiptData = {
+                              ...d.receiptData,
+                              issueDate: d.receiptData.issueDate ? new Date(d.receiptData.issueDate) : new Date(),
+                            };
+                            await downloadReceipt(rd, d.filename ?? "recibo.pdf");
+                          } catch (e: any) { toast.error(e.message ?? "erro ao gerar recibo"); }
+                        }}>
+                        <Download className="size-4" /> Baixar recibo (PDF)
+                      </Button>
+                    );
+                  }
+                  if (d.__action === "download_contract_pdf" && d.contractData) {
+                    return (
+                      <Button key={`contract-${i}`} size="sm" variant="outline" className="gap-2"
+                        onClick={async () => {
+                          try {
+                            const cd: ContractData = {
+                              ...d.contractData,
+                              startDate: new Date(d.contractData.startDate),
+                              endDate: new Date(d.contractData.endDate),
+                              signDate: d.contractData.signDate ? new Date(d.contractData.signDate) : undefined,
+                            };
+                            await downloadContract(cd, d.filename ?? "contrato.pdf");
+                          } catch (e: any) { toast.error(e.message ?? "erro ao gerar contrato"); }
+                        }}>
+                        <Download className="size-4" /> Baixar contrato (PDF)
+                      </Button>
+                    );
+                  }
+                  if (d.__action === "download_file" && typeof d.content === "string") {
+                    return (
+                      <Button key={`file-${i}`} size="sm" variant="outline" className="gap-2"
+                        onClick={() => downloadTextFile(d.content, d.filename ?? "dados.csv", d.mime ?? "text/plain;charset=utf-8")}>
+                        <Download className="size-4" /> Baixar arquivo
+                      </Button>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
             </>
           )}
         </CardContent>
