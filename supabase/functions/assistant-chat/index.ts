@@ -304,7 +304,8 @@ async function issueReceipt(args: { tenantId: string; amount: number; referenceM
   await s.from('receipts_history').insert({
     tenant_id: args.tenantId, amount: args.amount, reference_month: args.referenceMonth, notes: args.notes ?? null, receipt_number: number,
   });
-  return { ok: true, number };
+  const receiptData = await prepareReceiptData(args.tenantId, args.amount, args.referenceMonth, args.notes);
+  return { ok: true, number, __action: "download_receipt_pdf", filename: `recibo-${number.replace("/", "-")}.pdf`, receiptData };
 }
 
 async function draftMessage(args: { tenantId: string; type: 'friendly_charge' | 'formal_charge' | 'overdue' | 'renewal' | 'welcome' | 'thanks' }) {
