@@ -566,7 +566,9 @@ async function prepareReceiptPdf(args: { tenantId: string; amount?: number; refe
     if (!amount) amount = Number(p?.paid_amount ?? p?.amount ?? t.rent_amount ?? 0);
   }
   ref ||= today().slice(0, 7);
-  const [year, month] = ref.includes('-') ? ref.split('-').map(Number) : [new Date().getFullYear(), Number(ref.split('/')[0])];
+  const [year, month] = ref.includes('-')
+    ? ref.split('-').map(Number)
+    : (() => { const [mm, yyyy] = ref!.split('/').map(Number); return [yyyy || new Date().getFullYear(), mm]; })();
   const receiptData = {
     tenantName: t.name,
     tenantCpf: t.cpf,
@@ -742,8 +744,24 @@ async function prepareDataDownload(args: { kind: string; format?: 'csv' | 'json'
     const { data } = await s.from('receipts_history').select('receipt_number,amount,reference_month,issued_at,notes,tenants(name,cpf,phone,properties(name,address))').order('issued_at', { ascending: false }).limit(1000);
     rows = (data ?? []).map((r: any) => ({ numero: r.receipt_number, inquilino: r.tenants?.name, cpf: r.tenants?.cpf, telefone: r.tenants?.phone, imovel: r.tenants?.properties?.name, valor: r.amount, competencia: r.reference_month, emitido_em: r.issued_at, observacoes: r.notes }));
     filename = `recibos-${today()}.${format}`;
+  } else if (kind === 'tarefas' || kind === 'agenda' || kind === 'tasks') {
+    const { data } = await s.from('tasks').select('title,description,due_date,due_time,priority,status,completed_at,tenants(name),properties(name),leads(name)').order('due_date', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((t: any) => ({ titulo: t.title, descricao: t.description, data: t.due_date, hora: t.due_time, prioridade: t.priority, status: t.status, concluida_em: t.completed_at, inquilino: t.tenants?.name, imovel: t.properties?.name, lead: t.leads?.name }));
+    filename = `agenda-${today()}.${format}`;
+  } else if (kind === 'leads' || kind === 'crm' || kind === 'interessados') {
+    const { data } = await s.from('leads').select('name,phone,email,source,interest,budget,status,notes,next_followup,created_at,properties(name)').order('created_at', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((l: any) => ({ nome: l.name, telefone: l.phone, email: l.email, origem: l.source, interesse: l.interest, orcamento: l.budget, status: l.status, observacoes: l.notes, proximo_contato: l.next_followup, criado_em: l.created_at, imovel: l.properties?.name }));
+    filename = `crm-leads-${today()}.${format}`;
+  } else if (kind === 'alertas' || kind === 'alerts') {
+    const { data } = await s.from('alerts').select('type,title,message,due_date,is_read,created_at,tenants(name),contracts(id)').order('created_at', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((a: any) => ({ tipo: a.type, titulo: a.title, mensagem: a.message, data: a.due_date, lido: a.is_read, criado_em: a.created_at, inquilino: a.tenants?.name }));
+    filename = `alertas-${today()}.${format}`;
+  } else if (kind === 'despesas' || kind === 'expenses') {
+    const { data } = await s.from('expenses').select('description,amount,expense_date,category,notes,properties(name)').order('expense_date', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((e: any) => ({ descricao: e.description, valor: e.amount, data: e.expense_date, categoria: e.category, observacoes: e.notes, imovel: e.properties?.name }));
+    filename = `despesas-${today()}.${format}`;
   } else {
-    return { error: 'tipo de download não reconhecido. Use: inquilinos, ex-inquilinos, imoveis, pagamentos, inadimplencia, contratos ou recibos.' };
+    return { error: 'tipo de download não reconhecido. Use: inquilinos, ex-inquilinos, imoveis, pagamentos, inadimplencia, contratos, recibos, agenda, leads, alertas ou despesas.' };
   }
 
   const content = format === 'json' ? JSON.stringify(rows, null, 2) : toCsv(rows);
