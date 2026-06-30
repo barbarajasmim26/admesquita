@@ -509,7 +509,9 @@ async function prepareContractCopy(args: {
     const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('id', args.contractId).maybeSingle();
     contract = data;
   } else if (args.tenantId) {
-    const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('tenant_id', args.tenantId).order('start_date', { ascending: false }).limit(1).maybeSingle();
+    const resolved = await resolveTenant(args.tenantId, false);
+    if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+    const { data } = await s.from('contracts').select('*, tenants(*), properties(*)').eq('tenant_id', (resolved as any).tenant.id).order('start_date', { ascending: false }).limit(1).maybeSingle();
     contract = data;
   }
   if (!contract) return { error: 'contrato não encontrado' };
@@ -541,6 +543,211 @@ async function prepareContractCopy(args: {
   };
   const filename = `contrato-${(data.tenantName || 'novo').toString().toLowerCase().replace(/[^a-z0-9]+/g,'-')}.pdf`;
   return { __action: 'download_contract_pdf', filename, contractData: data, source_tenant: t.name };
+}
+
+async function prepareReceiptPdf(args: { tenantId: string; amount?: number; referenceMonth?: string; issueDate?: string; pixPayer?: string }) {
+  const s = sb();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
+  const { data: t } = await s.from('tenants').select('*, properties(*)').eq('id', tenantId).maybeSingle();
+  if (!t) return { error: 'inquilino não encontrado' };
+
+  let ref = args.referenceMonth;
+  let amount = args.amount;
+  if (!ref || !amount) {
+    const { data: p } = await s.from('payments')
+      .select('amount, paid_amount, due_date, paid_date, status')
+      .eq('tenant_id', tenantId)
+      .order('due_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!ref && p?.due_date) ref = ymOf(p.due_date);
+    if (!amount) amount = Number(p?.paid_amount ?? p?.amount ?? t.rent_amount ?? 0);
+  }
+  ref ||= today().slice(0, 7);
+  const [year, month] = ref.includes('-') ? ref.split('-').map(Number) : [new Date().getFullYear(), Number(ref.split('/')[0])];
+  const receiptData = {
+    tenantName: t.name,
+    tenantCpf: t.cpf,
+    amount: Number(amount ?? t.rent_amount ?? 0),
+    propertyName: t.properties?.name ?? '',
+    propertyAddress: t.properties?.address ?? null,
+    houseNumber: t.house_number ?? null,
+    referenceMonth: month,
+    referenceYear: year,
+    issueDate: args.issueDate ?? today(),
+    pixPayer: args.pixPayer ?? t.pix_payer ?? null,
+  };
+  const filename = `recibo-${t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${String(month).padStart(2, '0')}-${year}.pdf`;
+  return { __action: 'download_receipt_pdf', filename, receiptData };
+}
+
+async function updateFormerTenant(args: { tenantId: string; name?: string; phone?: string; email?: string; cpf?: string; house_number?: string; rent_amount?: number; due_day?: number; start_date?: string; exit_date?: string; final_balance?: number; notes?: string }) {
+  const s = sb();
+  const resolved = await resolveTenant(args.tenantId, false);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const hit = (resolved as any).tenant;
+  const payload: any = {};
+  for (const k of ['name','phone','email','cpf','house_number','rent_amount','due_day','start_date','exit_date','final_balance','notes']) {
+    if ((args as any)[k] !== undefined) payload[k] = (args as any)[k];
+  }
+  if (!Object.keys(payload).length) return { error: 'nenhum campo informado' };
+  if (hit.source === 'former_tenants') {
+    const { error } = await s.from('former_tenants').update(payload).eq('id', hit.id);
+    if (error) return { error: error.message };
+    return { ok: true, tenant: hit.name, updated: payload };
+  }
+  if (hit.status === 'inactive') {
+    const { error } = await s.from('tenants').update(payload).eq('id', hit.id);
+    if (error) return { error: error.message };
+    return { ok: true, tenant: hit.name, updated: payload };
+  }
+  return { error: 'este inquilino está ativo; use update_tenant' };
+}
+
+async function updateProperty(args: { propertyId: string; name?: string; address?: string; owner_name?: string; owner_phone?: string; category?: string; type?: string; iptu?: number; notes?: string }) {
+  const s = sb();
+  const resolved = await resolveProperty(args.propertyId);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const propertyId = (resolved as any).property.id;
+  const payload: any = {};
+  for (const k of ['name','address','owner_name','owner_phone','category','type','iptu','notes']) {
+    if ((args as any)[k] !== undefined) payload[k] = (args as any)[k];
+  }
+  if (!Object.keys(payload).length) return { error: 'nenhum campo informado' };
+  const { error } = await s.from('properties').update(payload).eq('id', propertyId);
+  if (error) return { error: error.message };
+  return { ok: true, property: (resolved as any).property.name, updated: payload };
+}
+
+async function createTask(args: { title: string; description?: string; dueDate?: string; dueTime?: string; priority?: string; tenantId?: string; propertyId?: string }) {
+  const s = sb();
+  let tenant_id: string | null = null;
+  let property_id: string | null = null;
+  if (args.tenantId) {
+    const r = await resolveTenant(args.tenantId, true);
+    if ((r as any).error || (r as any).ambiguous) return r;
+    tenant_id = (r as any).tenant.id;
+  }
+  if (args.propertyId) {
+    const r = await resolveProperty(args.propertyId);
+    if ((r as any).error || (r as any).ambiguous) return r;
+    property_id = (r as any).property.id;
+  }
+  const { data, error } = await s.from('tasks').insert({
+    title: args.title,
+    description: args.description ?? null,
+    due_date: args.dueDate ?? today(),
+    due_time: args.dueTime ?? null,
+    priority: args.priority ?? 'normal',
+    status: 'pending',
+    tenant_id, property_id,
+  }).select('id,title,due_date').single();
+  if (error) return { error: error.message };
+  return { ok: true, task: data };
+}
+
+async function createLead(args: { name: string; phone?: string; email?: string; source?: string; interest?: string; budget?: number; propertyId?: string; status?: string; notes?: string; next_followup?: string }) {
+  const s = sb();
+  let property_id: string | null = null;
+  if (args.propertyId) {
+    const r = await resolveProperty(args.propertyId);
+    if ((r as any).error || (r as any).ambiguous) return r;
+    property_id = (r as any).property.id;
+  }
+  const { data, error } = await s.from('leads').insert({
+    name: args.name, phone: args.phone ?? null, email: args.email ?? null, source: args.source ?? null,
+    interest: args.interest ?? null, budget: args.budget ?? null, property_id,
+    status: args.status ?? 'novo', notes: args.notes ?? null, next_followup: args.next_followup ?? null,
+  }).select('id,name,status').single();
+  if (error) return { error: error.message };
+  return { ok: true, lead: data };
+}
+
+async function updateMonthPayment(args: { tenantId: string; year: number; month: number; amount?: number; dueDate?: string; paidDate?: string; paidAmount?: number; status?: 'paid' | 'pending' | 'overdue'; notes?: string }) {
+  const s = sb();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
+  const { data: t } = await s.from('tenants').select('rent_amount,due_day').eq('id', tenantId).maybeSingle();
+  const start = firstDayOfMonth(args.year, args.month);
+  const end = lastDayOfMonth(args.year, args.month);
+  const { data: existing } = await s.from('payments').select('id').eq('tenant_id', tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
+  let paymentId = existing?.id;
+  if (!paymentId) {
+    const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', tenantId).eq('status', 'active').limit(1).maybeSingle();
+    if (!ct) return { error: 'sem contrato ativo' };
+    const dueDay = Math.min(Number(t?.due_day ?? 10), new Date(args.year, args.month, 0).getDate());
+    const { data: row, error } = await s.from('payments').insert({
+      tenant_id: tenantId, contract_id: ct.id, amount: Number(args.amount ?? t?.rent_amount ?? 0),
+      due_date: args.dueDate ?? `${args.year}-${String(args.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`,
+      status: args.status ?? 'pending', notes: args.notes ?? null,
+    }).select('id').single();
+    if (error) return { error: error.message };
+    paymentId = row.id;
+  }
+  const payload: any = {};
+  if (args.amount !== undefined) payload.amount = args.amount;
+  if (args.dueDate !== undefined) payload.due_date = args.dueDate;
+  if (args.notes !== undefined) payload.notes = args.notes;
+  if (args.status !== undefined) payload.status = args.status;
+  if (args.paidDate !== undefined) payload.paid_date = args.paidDate;
+  if (args.paidAmount !== undefined) payload.paid_amount = args.paidAmount;
+  if (args.status === 'paid') {
+    payload.paid_date = args.paidDate ?? today();
+    payload.paid_amount = args.paidAmount ?? args.amount ?? t?.rent_amount ?? 0;
+  }
+  if (args.status === 'pending' || args.status === 'overdue') {
+    payload.paid_date = null;
+    payload.paid_amount = null;
+  }
+  const { error } = await s.from('payments').update(payload).eq('id', paymentId);
+  if (error) return { error: error.message };
+  return { ok: true, competencia: `${MESES[args.month - 1]}/${args.year}`, updated: payload };
+}
+
+async function prepareDataDownload(args: { kind: string; format?: 'csv' | 'json'; tenantId?: string; year?: number; month?: number; status?: string }) {
+  const s = sb();
+  const kind = (args.kind ?? '').toLowerCase();
+  const format = args.format ?? 'csv';
+  let rows: any[] = [];
+  let filename = `${kind || 'dados'}-${today()}.${format}`;
+
+  if (kind === 'inquilinos' || kind === 'tenants') {
+    const { data } = await s.from('tenants').select('name,phone,email,cpf,status,house_number,rent_amount,due_day,start_date,properties(name,address,owner_name)').order('name').limit(1000);
+    rows = (data ?? []).map((t: any) => ({ nome: t.name, telefone: t.phone, email: t.email, cpf: t.cpf, status: t.status, casa: t.house_number, aluguel: t.rent_amount, vencimento: t.due_day, inicio: t.start_date, imovel: t.properties?.name, endereco: t.properties?.address, proprietario: t.properties?.owner_name }));
+    filename = `inquilinos-${today()}.${format}`;
+  } else if (kind === 'ex-inquilinos' || kind === 'former_tenants') {
+    const { data } = await s.from('former_tenants').select('name,phone,email,cpf,house_number,rent_amount,due_day,start_date,exit_date,final_balance,notes,properties(name,address,owner_name)').order('exit_date', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((t: any) => ({ nome: t.name, telefone: t.phone, email: t.email, cpf: t.cpf, casa: t.house_number, aluguel: t.rent_amount, vencimento: t.due_day, entrada: t.start_date, saida: t.exit_date, saldo_final: t.final_balance, observacoes: t.notes, imovel: t.properties?.name, endereco: t.properties?.address, proprietario: t.properties?.owner_name }));
+    filename = `ex-inquilinos-${today()}.${format}`;
+  } else if (kind === 'imoveis' || kind === 'properties') {
+    const { data } = await s.from('properties').select('name,address,category,type,owner_name,owner_phone,iptu,notes,tenants(name,status)').order('name').limit(1000);
+    rows = (data ?? []).map((p: any) => ({ imovel: p.name, endereco: p.address, categoria: p.category, tipo: p.type, proprietario: p.owner_name, telefone_proprietario: p.owner_phone, iptu: p.iptu, observacoes: p.notes, inquilinos_ativos: (p.tenants ?? []).filter((t: any) => t.status === 'active').map((t: any) => t.name).join(', ') }));
+    filename = `imoveis-${today()}.${format}`;
+  } else if (kind === 'pagamentos' || kind === 'payments' || kind === 'inadimplencia') {
+    let q: any = s.from('payments').select('amount,paid_amount,due_date,paid_date,status,notes,tenants(name,phone,status,properties(name,address))').order('due_date', { ascending: false });
+    if (args.status) q = q.eq('status', args.status);
+    if (kind === 'inadimplencia') q = q.neq('status', 'paid').lt('due_date', today());
+    if (args.year && args.month) q = q.gte('due_date', firstDayOfMonth(args.year, args.month)).lte('due_date', lastDayOfMonth(args.year, args.month));
+    const { data } = await q.limit(1500);
+    rows = (data ?? []).filter((p: any) => !p.tenants || p.tenants.status === 'active').map((p: any) => ({ inquilino: p.tenants?.name, telefone: p.tenants?.phone, imovel: p.tenants?.properties?.name, valor: p.amount, valor_pago: p.paid_amount, vencimento: p.due_date, pagamento: p.paid_date, status: p.status, observacoes: p.notes }));
+    filename = `${kind === 'inadimplencia' ? 'inadimplencia' : 'pagamentos'}-${today()}.${format}`;
+  } else if (kind === 'contratos' || kind === 'contracts') {
+    const { data } = await s.from('contracts').select('start_date,end_date,rent_amount,due_day,status,readjustment_index,guarantor_name,tenants(name,status),properties(name,address,owner_name)').order('start_date', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((c: any) => ({ inquilino: c.tenants?.name, status_inquilino: c.tenants?.status, imovel: c.properties?.name, endereco: c.properties?.address, proprietario: c.properties?.owner_name, inicio: c.start_date, fim: c.end_date, aluguel: c.rent_amount, vencimento: c.due_day, status: c.status, reajuste: c.readjustment_index, fiador: c.guarantor_name }));
+    filename = `contratos-${today()}.${format}`;
+  } else if (kind === 'recibos' || kind === 'receipts') {
+    const { data } = await s.from('receipts_history').select('receipt_number,amount,reference_month,issued_at,notes,tenants(name,cpf,phone,properties(name,address))').order('issued_at', { ascending: false }).limit(1000);
+    rows = (data ?? []).map((r: any) => ({ numero: r.receipt_number, inquilino: r.tenants?.name, cpf: r.tenants?.cpf, telefone: r.tenants?.phone, imovel: r.tenants?.properties?.name, valor: r.amount, competencia: r.reference_month, emitido_em: r.issued_at, observacoes: r.notes }));
+    filename = `recibos-${today()}.${format}`;
+  } else {
+    return { error: 'tipo de download não reconhecido. Use: inquilinos, ex-inquilinos, imoveis, pagamentos, inadimplencia, contratos ou recibos.' };
+  }
+
+  const content = format === 'json' ? JSON.stringify(rows, null, 2) : toCsv(rows);
+  return { __action: 'download_file', filename, mime: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8', content, rows: rows.length };
 }
 
 // ============== TOOL REGISTRY ==============
