@@ -192,13 +192,17 @@ async function listContractsEnding(days = 60) {
 // Register payment for a specific month. If month omitted, picks oldest open month.
 async function registerPayment(args: { tenantId: string; year?: number; month?: number; paidDate?: string; amount?: number }) {
   const s = sb();
-  const { data: t } = await s.from('tenants').select('id, rent_amount, due_day, name').eq('id', args.tenantId).maybeSingle();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
+  const { data: t } = await s.from('tenants').select('id, rent_amount, due_day, name, status').eq('id', tenantId).maybeSingle();
   if (!t) return { error: 'inquilino não encontrado' };
+  if (t.status !== 'active') return { error: 'inquilino não está ativo; não posso registrar pagamento em locação encerrada' };
 
   let year = args.year, month = args.month;
   if (!year || !month) {
     // pick oldest open
-    const { data: open } = await s.from('payments').select('id, due_date').eq('tenant_id', args.tenantId).neq('status', 'paid').order('due_date').limit(1);
+    const { data: open } = await s.from('payments').select('id, due_date').eq('tenant_id', tenantId).neq('status', 'paid').order('due_date').limit(1);
     if (open && open.length) {
       year = Number(open[0].due_date.slice(0, 4));
       month = Number(open[0].due_date.slice(5, 7));
@@ -213,17 +217,17 @@ async function registerPayment(args: { tenantId: string; year?: number; month?: 
   const start = `${year}-${mm}-01`;
   const lastDay = new Date(year!, month!, 0).getDate();
   const end = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
-  const { data: existing } = await s.from('payments').select('id').eq('tenant_id', args.tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
+  const { data: existing } = await s.from('payments').select('id').eq('tenant_id', tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
 
   let pid = existing?.id;
   const valor = Number(args.amount ?? t.rent_amount ?? 0);
   if (!pid) {
-    const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', args.tenantId).eq('status', 'active').limit(1).maybeSingle();
+    const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', tenantId).eq('status', 'active').limit(1).maybeSingle();
     if (!ct) return { error: 'sem contrato ativo' };
     const dueDay = Math.min(Number(t.due_day ?? 10), lastDay);
     const dueDate = `${year}-${mm}-${String(dueDay).padStart(2, '0')}`;
     const { data: ins, error } = await s.from('payments').insert({
-      tenant_id: args.tenantId, contract_id: ct.id, amount: valor, due_date: dueDate, status: 'pending',
+      tenant_id: tenantId, contract_id: ct.id, amount: valor, due_date: dueDate, status: 'pending',
     }).select('id').single();
     if (error) return { error: error.message };
     pid = ins.id;
@@ -236,11 +240,14 @@ async function registerPayment(args: { tenantId: string; year?: number; month?: 
 // Desmarca pagamento (volta para pendente) — corrige erros
 async function unmarkPayment(args: { tenantId: string; year: number; month: number }) {
   const s = sb();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
   const mm = String(args.month).padStart(2, '0');
   const start = `${args.year}-${mm}-01`;
   const lastDay = new Date(args.year, args.month, 0).getDate();
   const end = `${args.year}-${mm}-${String(lastDay).padStart(2, '0')}`;
-  const { data: p } = await s.from('payments').select('id').eq('tenant_id', args.tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
+  const { data: p } = await s.from('payments').select('id').eq('tenant_id', tenantId).gte('due_date', start).lte('due_date', end).limit(1).maybeSingle();
   if (!p) return { error: 'sem pagamento neste mês' };
   await s.from('payments').update({ status: 'pending', paid_date: null, paid_amount: null }).eq('id', p.id);
   return { ok: true, competencia: `${MESES[args.month - 1]}/${args.year}` };
@@ -249,44 +256,57 @@ async function unmarkPayment(args: { tenantId: string; year: number; month: numb
 // Atualiza dados do inquilino (vários campos opcionais)
 async function updateTenant(args: { tenantId: string; name?: string; phone?: string; cpf?: string; house_number?: string; rent_amount?: number; due_day?: number; pix_payer?: string; notes?: string; email?: string }) {
   const s = sb();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  if ((resolved as any).tenant.source !== 'tenants') return { error: 'este registro está em ex-inquilinos; use update_former_tenant para alterar histórico' };
+  const tenantId = (resolved as any).tenant.id;
   const payload: any = {};
   for (const k of ['name','phone','cpf','house_number','rent_amount','due_day','pix_payer','notes','email']) {
     if ((args as any)[k] !== undefined) payload[k] = (args as any)[k];
   }
   if (!Object.keys(payload).length) return { error: 'nenhum campo informado' };
-  const { error } = await s.from('tenants').update(payload).eq('id', args.tenantId);
+  const { error } = await s.from('tenants').update(payload).eq('id', tenantId);
   if (error) return { error: error.message };
   // Se rent_amount mudou, propaga para contrato ativo e pagamentos pendentes
   if (payload.rent_amount !== undefined) {
-    await s.from('contracts').update({ rent_amount: payload.rent_amount }).eq('tenant_id', args.tenantId).eq('status', 'active');
-    await s.from('payments').update({ amount: payload.rent_amount }).eq('tenant_id', args.tenantId).neq('status', 'paid');
+    await s.from('contracts').update({ rent_amount: payload.rent_amount }).eq('tenant_id', tenantId).eq('status', 'active');
+    await s.from('payments').update({ amount: payload.rent_amount }).eq('tenant_id', tenantId).neq('status', 'paid');
   }
   if (payload.due_day !== undefined) {
-    await s.from('contracts').update({ due_day: payload.due_day }).eq('tenant_id', args.tenantId).eq('status', 'active');
+    await s.from('contracts').update({ due_day: payload.due_day }).eq('tenant_id', tenantId).eq('status', 'active');
   }
-  return { ok: true, updated: payload };
+  return { ok: true, tenant: (resolved as any).tenant.name, updated: payload };
 }
 
 // Atualiza contrato ativo (datas, valor, índice, fiador)
 async function updateContract(args: { tenantId: string; start_date?: string; end_date?: string; rent_amount?: number; due_day?: number; duration_months?: number; readjustment_index?: string; guarantor_name?: string; guarantor_cpf?: string; guarantor_phone?: string; auto_renew?: boolean; status?: string; terms?: string }) {
   const s = sb();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
   const payload: any = {};
   for (const k of ['start_date','end_date','rent_amount','due_day','duration_months','readjustment_index','guarantor_name','guarantor_cpf','guarantor_phone','auto_renew','status','terms']) {
     if ((args as any)[k] !== undefined) payload[k] = (args as any)[k];
   }
   if (!Object.keys(payload).length) return { error: 'nenhum campo informado' };
-  const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', args.tenantId).eq('status', 'active').limit(1).maybeSingle();
+  const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', tenantId).eq('status', 'active').limit(1).maybeSingle();
   if (!ct) return { error: 'sem contrato ativo' };
   const { error } = await s.from('contracts').update(payload).eq('id', ct.id);
   if (error) return { error: error.message };
-  return { ok: true, updated: payload };
+  if (payload.rent_amount !== undefined) await s.from('tenants').update({ rent_amount: payload.rent_amount }).eq('id', tenantId);
+  if (payload.due_day !== undefined) await s.from('tenants').update({ due_day: payload.due_day }).eq('id', tenantId);
+  return { ok: true, tenant: (resolved as any).tenant.name, updated: payload };
 }
 
 // Transfere titularidade: encerra inquilino atual no imóvel e cria novo no mesmo imóvel
 async function transferTitularity(args: { fromTenantId: string; newName: string; newPhone?: string; newCpf?: string; rent_amount?: number; due_day?: number; start_date?: string; house_number?: string }) {
   const s = sb();
-  const { data: from } = await s.from('tenants').select('*, properties(name)').eq('id', args.fromTenantId).maybeSingle();
+  const resolved = await resolveTenant(args.fromTenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const fromTenantId = (resolved as any).tenant.id;
+  const { data: from } = await s.from('tenants').select('*, properties(name)').eq('id', fromTenantId).maybeSingle();
   if (!from) return { error: 'inquilino atual não encontrado' };
+  if (from.status !== 'active') return { error: 'inquilino de origem não está ativo' };
   const propertyId = from.property_id;
   const startDate = args.start_date ?? today();
   // arquivar antigo
@@ -296,7 +316,8 @@ async function transferTitularity(args: { fromTenantId: string; newName: string;
     start_date: from.start_date, exit_date: startDate, rent_amount: from.rent_amount, due_day: from.due_day,
     notes: `Transferência de titularidade para ${args.newName}`,
   });
-  await s.from('tenants').delete().eq('id', args.fromTenantId);
+  await s.from('tenants').update({ status: 'inactive' }).eq('id', fromTenantId);
+  await s.from('contracts').update({ status: 'ended', end_date: startDate }).eq('tenant_id', fromTenantId).eq('status', 'active');
   // criar novo
   const rent = args.rent_amount ?? Number(from.rent_amount ?? 0);
   const dueDay = args.due_day ?? Number(from.due_day ?? 10);
@@ -327,23 +348,31 @@ async function listPropertiesByOwner(ownerQuery: string) {
 
 async function endTenancy(args: { tenantId: string; endDate?: string; notes?: string }) {
   const s = sb();
-  const { data: t } = await s.from('tenants').select('*, properties(name)').eq('id', args.tenantId).maybeSingle();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
+  const { data: t } = await s.from('tenants').select('*, properties(name)').eq('id', tenantId).maybeSingle();
   if (!t) return { error: 'inquilino não encontrado' };
+  if (t.status !== 'active') return { error: 'inquilino já não está ativo' };
   const endDate = args.endDate ?? today();
   await s.from('former_tenants').insert({
     name: t.name, property_id: t.property_id, phone: t.phone, email: t.email, cpf: t.cpf, house_number: t.house_number,
     start_date: t.start_date, exit_date: endDate, rent_amount: t.rent_amount, due_day: t.due_day, notes: args.notes ?? t.notes,
   });
-  await s.from('tenants').delete().eq('id', args.tenantId);
+  await s.from('tenants').update({ status: 'inactive' }).eq('id', tenantId);
+  await s.from('contracts').update({ status: 'ended', end_date: endDate }).eq('tenant_id', tenantId).eq('status', 'active');
   return { ok: true, name: t.name, end_date: endDate };
 }
 
 async function createCharge(args: { tenantId: string; amount: number; dueDate: string; notes?: string }) {
   const s = sb();
-  const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', args.tenantId).eq('status', 'active').limit(1).maybeSingle();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
+  const { data: ct } = await s.from('contracts').select('id').eq('tenant_id', tenantId).eq('status', 'active').limit(1).maybeSingle();
   if (!ct) return { error: 'sem contrato ativo' };
   const { error } = await s.from('payments').insert({
-    tenant_id: args.tenantId, contract_id: ct.id, amount: args.amount, due_date: args.dueDate, status: 'pending', notes: args.notes,
+    tenant_id: tenantId, contract_id: ct.id, amount: args.amount, due_date: args.dueDate, status: 'pending', notes: args.notes,
   });
   if (error) return { error: error.message };
   return { ok: true };
@@ -351,7 +380,10 @@ async function createCharge(args: { tenantId: string; amount: number; dueDate: s
 
 async function getReceiptData(tenantId: string, amount: number, referenceMonth: string, notes?: string) {
   const s = sb();
-  const { data: t } = await s.from("tenants").select("*, properties(*)").eq("id", tenantId).maybeSingle();
+  const resolved = await resolveTenant(tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return null;
+  const id = (resolved as any).tenant.id;
+  const { data: t } = await s.from("tenants").select("*, properties(*)").eq("id", id).maybeSingle();
   if (!t) return null;
   const [year, month] = referenceMonth.split("-").map(Number);
   return {
@@ -370,15 +402,18 @@ async function getReceiptData(tenantId: string, amount: number, referenceMonth: 
 
 async function issueReceipt(args: { tenantId: string; amount: number; referenceMonth: string; notes?: string }) {
   const s = sb();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const tenantId = (resolved as any).tenant.id;
   const year = new Date().getFullYear();
   const { count } = await s.from('receipts_history').select('*', { count: 'exact', head: true })
     .gte('issued_at', `${year}-01-01`).lt('issued_at', `${year + 1}-01-01`);
   const seq = String((count ?? 0) + 1).padStart(4, '0');
   const number = `${year}/${seq}`;
   await s.from('receipts_history').insert({
-    tenant_id: args.tenantId, amount: args.amount, reference_month: args.referenceMonth, notes: args.notes ?? null, receipt_number: number,
+    tenant_id: tenantId, amount: args.amount, reference_month: args.referenceMonth, notes: args.notes ?? null, receipt_number: number,
   });
-  const receiptData = await getReceiptData(args.tenantId, args.amount, args.referenceMonth, args.notes);
+  const receiptData = await getReceiptData(tenantId, args.amount, args.referenceMonth, args.notes);
   return { ok: true, number, __action: "download_receipt_pdf", filename: `recibo-${number.replace("/", "-")}.pdf`, receiptData };
 }
 
