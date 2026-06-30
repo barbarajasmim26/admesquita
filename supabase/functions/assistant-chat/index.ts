@@ -294,6 +294,25 @@ async function createCharge(args: { tenantId: string; amount: number; dueDate: s
   return { ok: true };
 }
 
+async function getReceiptData(tenantId: string, amount: number, referenceMonth: string, notes?: string) {
+  const s = sb();
+  const { data: t } = await s.from("tenants").select("*, properties(*)").eq("id", tenantId).maybeSingle();
+  if (!t) return null;
+  const [year, month] = referenceMonth.split("-").map(Number);
+  return {
+    tenantName: t.name,
+    tenantCpf: t.cpf,
+    amount,
+    propertyName: t.properties?.name,
+    propertyAddress: t.properties?.address,
+    houseNumber: t.house_number,
+    referenceMonth: month,
+    referenceYear: year,
+    pixPayer: t.pix_payer,
+    notes
+  };
+}
+
 async function issueReceipt(args: { tenantId: string; amount: number; referenceMonth: string; notes?: string }) {
   const s = sb();
   const year = new Date().getFullYear();
@@ -304,7 +323,7 @@ async function issueReceipt(args: { tenantId: string; amount: number; referenceM
   await s.from('receipts_history').insert({
     tenant_id: args.tenantId, amount: args.amount, reference_month: args.referenceMonth, notes: args.notes ?? null, receipt_number: number,
   });
-  const receiptData = await prepareReceiptData(args.tenantId, args.amount, args.referenceMonth, args.notes);
+  const receiptData = await getReceiptData(args.tenantId, args.amount, args.referenceMonth, args.notes);
   return { ok: true, number, __action: "download_receipt_pdf", filename: `recibo-${number.replace("/", "-")}.pdf`, receiptData };
 }
 
@@ -414,7 +433,7 @@ const TOOLS = [
   { name: 'transfer_titularity', description: 'Transfere titularidade do imóvel: arquiva inquilino atual em ex-inquilinos e cria novo no mesmo imóvel com novo contrato. Use para "troca o nome do contrato para X", "agora quem mora é X", "passa para o nome do X".', parameters: { type: 'object', properties: { fromTenantId: { type: 'string' }, newName: { type: 'string' }, newPhone: { type: 'string' }, newCpf: { type: 'string' }, rent_amount: { type: 'number' }, due_day: { type: 'number' }, start_date: { type: 'string' }, house_number: { type: 'string' } }, required: ['fromTenantId','newName'] }, fn: (a: any) => transferTitularity(a) },
   { name: 'end_tenancy', description: 'Encerra contrato — move para ex-inquilinos. endDate default hoje.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, endDate: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId'] }, fn: (a: any) => endTenancy(a) },
   { name: 'create_charge', description: 'Cria nova cobrança avulsa para um inquilino.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, dueDate: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'dueDate'] }, fn: (a: any) => createCharge(a) },
-  { name: 'issue_receipt', description: 'Registra recibo no histórico. referenceMonth no formato YYYY-MM.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, referenceMonth: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'referenceMonth'] }, fn: (a: any) => issueReceipt(a) },
+  { name: 'issue_receipt', description: 'Registra recibo no histórico e gera PDF para download. referenceMonth no formato YYYY-MM.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, amount: { type: 'number' }, referenceMonth: { type: 'string' }, notes: { type: 'string' } }, required: ['tenantId', 'amount', 'referenceMonth'] }, fn: (a: any) => issueReceipt(a) },
   { name: 'draft_message', description: 'Gera mensagem profissional para WhatsApp + link wa.me. Tipos: friendly_charge, formal_charge, overdue, renewal, welcome, thanks.', parameters: { type: 'object', properties: { tenantId: { type: 'string' }, type: { type: 'string', enum: ['friendly_charge','formal_charge','overdue','renewal','welcome','thanks'] } }, required: ['tenantId', 'type'] }, fn: (a: any) => draftMessage(a) },
   { name: 'prepare_contract_copy', description: 'Gera um PDF de contrato copiando um contrato existente (do tenantId ou contractId) e aplicando overrides (novo nome, novo valor, novo endereço, novas datas, etc.). NÃO altera o contrato original — apenas devolve um PDF para download. Use quando o usuário pedir "faz um contrato igual o do X mudando isso", "copia o contrato do Adones para Joaquim", "preciso de um contrato pro Y nos mesmos moldes do Z", etc.', parameters: { type: 'object', properties: { tenantId: { type: 'string', description: 'inquilino de origem (busca o contrato mais recente)' }, contractId: { type: 'string', description: 'id direto do contrato de origem (opcional)' }, overrides: { type: 'object', properties: { tenantName: { type: 'string' }, tenantNationality: { type: 'string' }, tenantMaritalStatus: { type: 'string' }, tenantProfession: { type: 'string' }, tenantRg: { type: 'string' }, tenantCpf: { type: 'string' }, tenantAddress: { type: 'string' }, propertyAddress: { type: 'string' }, rentAmount: { type: 'number' }, depositAmount: { type: 'number' }, dueDay: { type: 'number' }, startDate: { type: 'string' }, endDate: { type: 'string' }, signDate: { type: 'string' }, durationYears: { type: 'number' }, readjustmentIndex: { type: 'string' } } } } }, fn: (a: any) => prepareContractCopy(a) },
 ];

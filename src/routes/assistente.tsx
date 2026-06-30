@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Bot, Send, Loader2, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { downloadReceipt, type ReceiptData } from "@/lib/receipt-pdf";
 import { downloadContract, type ContractData } from "@/lib/contract-pdf";
 import { Download } from "lucide-react";
 
@@ -167,7 +168,7 @@ function Bubble({ msg }: { msg: Msg }) {
   const isUser = msg.role === "user";
   const downloads = (msg.toolTrace ?? [])
     .map(t => t.result)
-    .filter(r => r && r.__action === "download_contract_pdf" && r.contractData);
+    .filter(r => r && r.__action === "download_contract_pdf" || r.__action === "download_receipt_pdf");
   return (
     <div className={`flex gap-3 max-w-3xl ${isUser ? "ml-auto flex-row-reverse" : ""}`}>
       <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}>
@@ -182,7 +183,18 @@ function Bubble({ msg }: { msg: Msg }) {
               <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-headings:my-2">
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
               </div>
-              {downloads.map((d: any, i: number) => (
+              {downloads.filter((d: any) => d.__action === "download_receipt_pdf").map((d: any, i: number) => (
+                <Button key={`receipt-${i}`} size="sm" variant="outline" className="mt-2 gap-2"
+                  onClick={async () => {
+                    try {
+                      await downloadReceipt(d.receiptData, d.filename ?? "recibo.pdf");
+                    } catch (e: any) { toast.error(e.message ?? "erro ao gerar PDF"); }
+                  }}>
+                  <Download className="size-4" /> Baixar recibo (PDF)
+                </Button>
+              ))}
+
+              {downloads.filter((d: any) => d.__action === "download_contract_pdf").map((d: any, i: number) => (
                 <Button key={i} size="sm" variant="outline" className="mt-2 gap-2"
                   onClick={async () => {
                     try {
