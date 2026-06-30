@@ -133,9 +133,21 @@ async function listActiveTenants() {
 
 async function getTenantSummary(tenantId: string) {
   const s = sb();
+  const resolved = await resolveTenant(tenantId, false);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const hit = (resolved as any).tenant;
+  if (hit.source === 'former_tenants') {
+    const { data: f } = await s.from('former_tenants').select('*, properties(id,name,address,owner_name,owner_phone)').eq('id', hit.id).maybeSingle();
+    if (!f) return { error: 'ex-inquilino não encontrado' };
+    return {
+      tenant: { id: f.id, name: f.name, phone: f.phone, cpf: f.cpf, rent: Number(f.rent_amount ?? 0), due_day: f.due_day, status: 'former', property: f.properties?.name, house_number: f.house_number, exit_date: f.exit_date },
+      open_months: [], overdue_count: 0, last_payments: [],
+      note: 'Registro localizado em ex-inquilinos.'
+    };
+  }
   const [{ data: t }, { data: pays }] = await Promise.all([
-    s.from('tenants').select('*, properties(id,name,address)').eq('id', tenantId).maybeSingle(),
-    s.from('payments').select('id, amount, paid_amount, due_date, paid_date, status').eq('tenant_id', tenantId).order('due_date', { ascending: false }).limit(36),
+    s.from('tenants').select('*, properties(id,name,address)').eq('id', hit.id).maybeSingle(),
+    s.from('payments').select('id, amount, paid_amount, due_date, paid_date, status').eq('tenant_id', hit.id).order('due_date', { ascending: false }).limit(36),
   ]);
   if (!t) return { error: 'inquilino não encontrado' };
   const td = today();
@@ -152,10 +164,11 @@ async function getTenantSummary(tenantId: string) {
 async function listOverdue() {
   const s = sb();
   await s.from('payments').update({ status: 'overdue' }).eq('status', 'pending').lt('due_date', today());
-  const { data } = await s.from('payments').select('id, amount, due_date, tenant_id, tenants(id,name,phone,properties(name))')
+  const { data } = await s.from('payments').select('id, amount, due_date, tenant_id, tenants(id,name,phone,status,properties(name))')
     .neq('status', 'paid').lt('due_date', today()).limit(500);
   const map: Record<string, any> = {};
   (data ?? []).forEach((p: any) => {
+    if (!p.tenants || p.tenants.status !== 'active') return;
     const k = p.tenant_id;
     map[k] ||= { tenant_id: k, name: p.tenants?.name, phone: p.tenants?.phone, property: p.tenants?.properties?.name, total: 0, months: [], oldest: p.due_date };
     map[k].total += Number(p.amount);
@@ -419,7 +432,9 @@ async function issueReceipt(args: { tenantId: string; amount: number; referenceM
 
 async function draftMessage(args: { tenantId: string; type: 'friendly_charge' | 'formal_charge' | 'overdue' | 'renewal' | 'welcome' | 'thanks' }) {
   const s = sb();
-  const { data: t } = await s.from('tenants').select('name, phone, rent_amount, due_day, pix_payer, properties(name)').eq('id', args.tenantId).maybeSingle();
+  const resolved = await resolveTenant(args.tenantId, true);
+  if ((resolved as any).error || (resolved as any).ambiguous) return resolved;
+  const { data: t } = await s.from('tenants').select('name, phone, rent_amount, due_day, pix_payer, properties(name)').eq('id', (resolved as any).tenant.id).maybeSingle();
   if (!t) return { error: 'inquilino não encontrado' };
   const name = (t.name as string).split(' ')[0];
   const valor = brl(Number(t.rent_amount ?? 0));
