@@ -1,5 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, AlertTriangle, FileText, Users, Home, FileSignature, UserMinus, Bell, Calendar, UserPlus, ClipboardList, BarChart3, MessageCircle, Bot } from "lucide-react";
+import { LayoutDashboard, Wallet, AlertTriangle, FileText, Users, Home, FileSignature, UserMinus, Bell, Calendar, UserPlus, ClipboardList, BarChart3, MessageCircle, Bot, Megaphone } from "lucide-react";
 import logo from "@/assets/mesquita-logo.png";
 import { cn } from "@/lib/utils";
 import { BotBell } from "@/components/BotBell";
@@ -17,6 +17,7 @@ const NAV = [
   { to: "/contratos", label: "Contratos", icon: FileSignature },
   { to: "/ex-inquilinos", label: "Ex-inquilinos", icon: UserMinus },
   { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { to: "/broadcast", label: "Disparo em grupo", icon: Megaphone },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/alertas", label: "Alertas", icon: Bell },
   { to: "/calendario", label: "Calendário", icon: Calendar },
