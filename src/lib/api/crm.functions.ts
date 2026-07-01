@@ -825,6 +825,31 @@ export const listMonthPayments = async (data: { year: number; month: number }) =
   const start = `${data.year}-${mm}-01`;
   const last = new Date(data.year, data.month, 0).getDate();
   const end = `${data.year}-${mm}-${String(last).padStart(2, "0")}`;
+  // Auto-generate pending payments for active tenants missing this month
+  const { data: activeTenants } = await s.from("tenants")
+    .select("id, rent_amount, due_day, contracts!inner(id, status)")
+    .eq("status", "active");
+  if (activeTenants && activeTenants.length) {
+    const { data: existing } = await s.from("payments")
+      .select("tenant_id").gte("due_date", start).lte("due_date", end).limit(5000);
+    const has = new Set((existing ?? []).map((r: any) => r.tenant_id));
+    const toInsert: any[] = [];
+    for (const t of activeTenants as any[]) {
+      if (has.has(t.id)) continue;
+      const activeContract = (t.contracts ?? []).find((c: any) => c.status === "active");
+      if (!activeContract) continue;
+      const dueDay = Math.min(Number(t.due_day ?? 10), last);
+      toInsert.push({
+        tenant_id: t.id,
+        contract_id: activeContract.id,
+        amount: Number(t.rent_amount ?? 0),
+        due_date: `${data.year}-${mm}-${String(dueDay).padStart(2, "0")}`,
+        status: "pending",
+      });
+    }
+    if (toInsert.length) await s.from("payments").insert(toInsert);
+  }
+  await syncOverdue();
   const { data: rows, error } = await s.from("payments")
     .select("id, amount, due_date, status, tenants(name, status, properties(name))")
     .gte("due_date", start).lte("due_date", end).limit(2000);
