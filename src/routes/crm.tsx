@@ -60,22 +60,22 @@ function Page() {
     if (!form.name) { toast.error("Informe o nome"); return; }
     await save({ data: { ...form, id: editing?.id, budget: Number(form.budget) || undefined } });
     toast.success("Lead salvo");
-    qc.invalidateQueries({ queryKey: ["leads"] });
+    qc.invalidateQueries();
     setOpen(false);
   }
   async function move(id: string, status: string) {
     await update({ data: { id, status } });
-    qc.invalidateQueries({ queryKey: ["leads"] });
+    qc.invalidateQueries();
   }
   async function remove(id: string) {
     if (!confirm("Excluir este lead?")) return;
     await del({ data: { id } });
-    qc.invalidateQueries({ queryKey: ["leads"] });
+    qc.invalidateQueries();
   }
   async function loadDemo() {
     await seed();
     toast.success("Leads de demonstração carregados");
-    qc.invalidateQueries({ queryKey: ["leads"] });
+    qc.invalidateQueries();
   }
 
   return (

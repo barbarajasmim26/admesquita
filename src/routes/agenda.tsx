@@ -47,18 +47,18 @@ function Page() {
     if (!form.title || !form.dueDate) { toast.error("Título e data são obrigatórios"); return; }
     await save({ data: form });
     toast.success("Tarefa criada");
-    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries();
     setForm({ priority: "normal" });
     setOpen(false);
   }
   async function onToggle(t: any) {
     await toggle({ data: { id: t.id, status: t.status === "done" ? "pending" : "done" } });
-    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries();
   }
   async function remove(id: string) {
     if (!confirm("Excluir?")) return;
     await del({ data: { id } });
-    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries();
   }
 
   const PRIO_COLOR: Record<string, string> = { alta: "bg-rose-500", normal: "bg-blue-500", baixa: "bg-slate-400" };
