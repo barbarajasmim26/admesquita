@@ -38,7 +38,7 @@ function Page() {
     for (const t of tenants as any[]) {
       const p = t.properties;
       if (!p) continue;
-      const g = m.get(p.id) ?? { id: p.id, name: p.name, tenants: [] };
+      const g = m.get(p.id) ?? { id: p.id, name: p.name, tenants: [] as any[] };
       g.tenants.push(t);
       m.set(p.id, g);
     }
