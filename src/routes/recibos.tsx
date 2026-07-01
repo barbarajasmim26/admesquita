@@ -66,7 +66,7 @@ function Page() {
       const p: any = await fetchAny();
       if (!p) { toast.error("Nenhum pagamento encontrado no sistema."); return; }
       await emitFromPayment(p, register);
-      qc.invalidateQueries({ queryKey: ["receipts"] });
+      qc.invalidateQueries();
     } catch (e: any) {
       toast.error(e.message ?? "Erro");
     }
@@ -75,7 +75,7 @@ function Page() {
   async function emit(p: any) {
     const full: any = await fetchOne({ data: { paymentId: p.id } });
     await emitFromPayment(full, register);
-    qc.invalidateQueries({ queryKey: ["receipts"] });
+    qc.invalidateQueries();
   }
 
   async function downloadBlank() {
