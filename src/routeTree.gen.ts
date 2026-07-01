@@ -20,6 +20,7 @@ import { Route as ExInquilinosRouteImport } from './routes/ex-inquilinos'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as ContratosRouteImport } from './routes/contratos'
 import { Route as CalendarioRouteImport } from './routes/calendario'
+import { Route as BroadcastRouteImport } from './routes/broadcast'
 import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as AgendaRouteImport } from './routes/agenda'
@@ -85,6 +86,11 @@ const CalendarioRoute = CalendarioRouteImport.update({
   path: '/calendario',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BroadcastRoute = BroadcastRouteImport.update({
+  id: '/broadcast',
+  path: '/broadcast',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssistenteRoute = AssistenteRouteImport.update({
   id: '/assistente',
   path: '/assistente',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AgendaRoute
   '/alertas': typeof AlertasRoute
   '/assistente': typeof AssistenteRoute
+  '/broadcast': typeof BroadcastRoute
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/agenda': typeof AgendaRoute
   '/alertas': typeof AlertasRoute
   '/assistente': typeof AssistenteRoute
+  '/broadcast': typeof BroadcastRoute
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/agenda': typeof AgendaRoute
   '/alertas': typeof AlertasRoute
   '/assistente': typeof AssistenteRoute
+  '/broadcast': typeof BroadcastRoute
   '/calendario': typeof CalendarioRoute
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/alertas'
     | '/assistente'
+    | '/broadcast'
     | '/calendario'
     | '/contratos'
     | '/crm'
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/alertas'
     | '/assistente'
+    | '/broadcast'
     | '/calendario'
     | '/contratos'
     | '/crm'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/alertas'
     | '/assistente'
+    | '/broadcast'
     | '/calendario'
     | '/contratos'
     | '/crm'
@@ -268,6 +280,7 @@ export interface RootRouteChildren {
   AgendaRoute: typeof AgendaRoute
   AlertasRoute: typeof AlertasRoute
   AssistenteRoute: typeof AssistenteRoute
+  BroadcastRoute: typeof BroadcastRoute
   CalendarioRoute: typeof CalendarioRoute
   ContratosRoute: typeof ContratosRoute
   CrmRoute: typeof CrmRoute
@@ -358,6 +371,13 @@ declare module '@tanstack/react-router' {
       path: '/calendario'
       fullPath: '/calendario'
       preLoaderRoute: typeof CalendarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/broadcast': {
+      id: '/broadcast'
+      path: '/broadcast'
+      fullPath: '/broadcast'
+      preLoaderRoute: typeof BroadcastRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assistente': {
@@ -470,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgendaRoute: AgendaRoute,
   AlertasRoute: AlertasRoute,
   AssistenteRoute: AssistenteRoute,
+  BroadcastRoute: BroadcastRoute,
   CalendarioRoute: CalendarioRoute,
   ContratosRoute: ContratosRoute,
   CrmRoute: CrmRoute,
