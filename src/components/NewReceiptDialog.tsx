@@ -17,6 +17,7 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
   const [propertyId, setPropertyId] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [amount, setAmount] = useState("");
+  const [kind, setKind] = useState<"aluguel" | "caucao">("aluguel");
   const [refMonth, setRefMonth] = useState(() => {
     const d = new Date();
     return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
@@ -30,8 +31,9 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
       setPropertyId(prefill.propertyId ?? "");
       setTenantId(prefill.tenantId ?? "");
       setAmount(String(prefill.amount ?? ""));
+      setKind(prefill.kind ?? "aluguel");
     } else {
-      setPropertyId(""); setTenantId(""); setAmount("");
+      setPropertyId(""); setTenantId(""); setAmount(""); setKind("aluguel");
     }
     setPixPayer(prefill?.pixPayer ?? "");
   }, [open, prefill]);
@@ -42,6 +44,7 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
 
   useEffect(() => {
     if (tenant && !pixPayer) setPixPayer(tenant.pix_payer ?? "");
+    if (tenant && kind === "caucao" && !amount) setAmount(String(tenant.deposit ?? tenant.rent_amount ?? ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
@@ -61,8 +64,9 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
         referenceYear: yyyy,
         issueDate: new Date(issueDate + "T12:00:00"),
         pixPayer: pixPayer.trim() || null,
-      }, `recibo_${tenant.name.replace(/\s+/g, "_")}_${mm}_${yyyy}.pdf`);
-      const r: any = await issue({ data: { tenantId: tenant.id, amount: val, referenceMonth: refMonth } });
+        kind,
+      }, `recibo_${kind === "caucao" ? "caucao_" : ""}${tenant.name.replace(/\s+/g, "_")}_${mm}_${yyyy}.pdf`);
+      const r: any = await issue({ data: { tenantId: tenant.id, amount: val, referenceMonth: kind === "caucao" ? `CAUÇÃO ${refMonth}` : refMonth } });
       toast.success(`Recibo ${r.number} emitido!`);
       qc.invalidateQueries({ queryKey: ["receipts"] });
       onClose();
@@ -74,6 +78,16 @@ export function NewReceiptDialog({ open, onClose, prefill }: { open: boolean; on
       <DialogContent>
         <DialogHeader><DialogTitle>Novo recibo</DialogTitle></DialogHeader>
         <div className="space-y-3 text-sm">
+          <div>
+            <Label>Tipo de recibo</Label>
+            <Select value={kind} onValueChange={(v: any) => setKind(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aluguel">Aluguel</SelectItem>
+                <SelectItem value="caucao">Caução (depósito de garantia)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Label>Condomínio / Imóvel</Label>
             <Select value={propertyId} onValueChange={(v) => { setPropertyId(v); setTenantId(""); }}>

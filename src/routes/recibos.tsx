@@ -111,11 +111,13 @@ function Page() {
       const prop = t.properties ?? {};
       // reference_month "MM/YYYY"
       let m = new Date().getMonth() + 1, y = new Date().getFullYear();
-      if (r.reference_month && /^\d{2}\/\d{4}$/.test(r.reference_month)) {
-        const [mm, yy] = r.reference_month.split("/");
+      const isCaucao = typeof r.reference_month === "string" && /CAU[ÇC]AO/i.test(r.reference_month);
+      const refClean = (r.reference_month ?? "").replace(/CAU[ÇC]AO\s*/i, "");
+      if (refClean && /^\d{2}\/\d{4}$/.test(refClean)) {
+        const [mm, yy] = refClean.split("/");
         m = Number(mm); y = Number(yy);
-      } else if (r.reference_month && /^\d{4}-\d{2}$/.test(r.reference_month)) {
-        const [yy, mm] = r.reference_month.split("-");
+      } else if (refClean && /^\d{4}-\d{2}$/.test(refClean)) {
+        const [yy, mm] = refClean.split("-");
         m = Number(mm); y = Number(yy);
       }
       await downloadReceipt({
@@ -129,6 +131,7 @@ function Page() {
         referenceYear: y,
         issueDate: r.issued_at ? new Date(r.issued_at) : new Date(),
         pixPayer: t.pix_payer ?? null,
+        kind: isCaucao ? "caucao" : "aluguel",
       }, `recibo_${r.receipt_number?.replace(/\//g, "-")}_${(t.name ?? "").replace(/\s+/g, "_")}.pdf`);
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao baixar");
