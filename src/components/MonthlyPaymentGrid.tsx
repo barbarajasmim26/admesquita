@@ -63,7 +63,7 @@ export function MonthlyPaymentGrid({
     }
   }
 
-  async function downloadReceiptForMonth(payment: PaymentRow) {
+  async function downloadReceiptForMonth(payment: PaymentRow, kind: "aluguel" | "caucao" = "aluguel") {
     try {
       const tenant: any = tenantData || {};
       const property: any = tenant?.properties;
@@ -78,7 +78,8 @@ export function MonthlyPaymentGrid({
         referenceMonth: due.getMonth() + 1,
         referenceYear: due.getFullYear(),
         issueDate: payment.paid_date ? new Date(payment.paid_date + "T12:00:00") : new Date(),
-      }, `recibo_${(tenant?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
+        kind,
+      }, `recibo_${kind === "caucao" ? "caucao_" : ""}${(tenant?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao baixar recibo");
     }
@@ -149,9 +150,14 @@ export function MonthlyPaymentGrid({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {p && p.status === "paid" && (
-                    <DropdownMenuItem onClick={() => downloadReceiptForMonth(p)}>
-                      <Download className="size-4 mr-2 text-blue-500" /> Baixar recibo
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={() => downloadReceiptForMonth(p, "aluguel")}>
+                        <Download className="size-4 mr-2 text-blue-500" /> Baixar recibo
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => downloadReceiptForMonth(p, "caucao")}>
+                        <Download className="size-4 mr-2 text-violet-500" /> Baixar recibo de caução
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuItem onClick={() => update(monthNum, "paid")}>
                     <Check className="size-4 mr-2 text-emerald-500" /> Marcar como pago
