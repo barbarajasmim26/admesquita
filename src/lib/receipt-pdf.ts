@@ -14,6 +14,7 @@ export interface ReceiptData {
   referenceYear: number;
   issueDate?: Date;
   pixPayer?: string | null;
+  kind?: "aluguel" | "caucao";
 }
 
 const FIXED = {
@@ -44,7 +45,8 @@ export async function generateReceiptPDF(d: ReceiptData): Promise<Blob> {
   // --- TITLE ---
   doc.setFont("times", "bold");
   doc.setFontSize(16);
-  doc.text("RECIBO DE PAGAMENTO", pageW / 2, 78, { align: "center" });
+  const title = d.kind === "caucao" ? "RECIBO DE CAUÇÃO" : "RECIBO DE PAGAMENTO";
+  doc.text(title, pageW / 2, 78, { align: "center" });
 
   // --- BODY ---
   doc.setFont("times", "normal");
@@ -72,12 +74,15 @@ export async function generateReceiptPDF(d: ReceiptData): Promise<Blob> {
   let y = 100;
 
   // Build a token stream of { text, bold }
+  const refPhrase = d.kind === "caucao"
+    ? `, valor este referente à caução (depósito de garantia) do imóvel localizado na ${address}`
+    : `, valor este referente ao aluguel do mês de ${mes}, do imóvel localizado na ${address}`;
   const tokens: { text: string; bold: boolean }[] = [
     { text: "Recebi de ", bold: false },
     { text: d.tenantName.toUpperCase(), bold: true },
     { text: `, brasileiro(a)${cpfTxt}, o valor de `, bold: false },
     { text: `${valor} (${extenso})`, bold: true },
-    { text: `${d.pixPayer ? ` via pix por ${d.pixPayer}` : " via pix"}, valor este referente ao aluguel do mês de ${mes}, do imóvel localizado na ${address}`, bold: false },
+    { text: `${d.pixPayer ? ` via pix por ${d.pixPayer}` : " via pix"}${refPhrase}`, bold: false },
   ];
 
   // Word-by-word layout preserving bold
