@@ -33,6 +33,11 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
 
   const property: any = (props ?? []).find((p: any) => p.id === f.propertyId);
   const selectedTemplate = CONTRACT_TEMPLATES.find((t) => t.id === f.templateId) ?? findTemplateForProperty(property?.name);
+  const isManual = f.templateId === "manual";
+  const baseAddress = isManual
+    ? (f.manualAddress ?? "")
+    : (selectedTemplate?.defaultAddress ?? property?.address ?? property?.name ?? "");
+  const fullPropertyAddress = `${baseAddress}${f.houseNumber ? `, casa ${f.houseNumber}` : ""}`;
 
   async function submit(saveAlso: boolean) {
     if (!f.propertyId || !f.name || !f.rentAmount) {
@@ -54,8 +59,9 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
         tenantProfession: f.profession,
         tenantRg: f.rg,
         tenantCpf: f.cpf,
-        tenantAddress: f.tenantAddress || (property?.address ?? ""),
-        propertyAddress: `${selectedTemplate?.defaultAddress ?? property?.address ?? property?.name}${f.houseNumber ? `, casa ${f.houseNumber}` : ""}`,
+        // Locatário reside no próprio imóvel locado — mesmo endereço e numeração do OBJETO
+        tenantAddress: f.tenantAddress?.trim() ? f.tenantAddress : fullPropertyAddress,
+        propertyAddress: fullPropertyAddress,
         startDate: start,
         endDate: end,
         rentAmount: rent,
@@ -108,6 +114,17 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
             )}
           </div>
 
+          {isManual && (
+            <div>
+              <Label>Endereço manual do imóvel *</Label>
+              <Input
+                value={f.manualAddress ?? ""}
+                onChange={e => setF({ ...f, manualAddress: e.target.value })}
+                placeholder="Ex: Rua X, nº 000, Bairro, Cidade/UF"
+              />
+            </div>
+          )}
+
           <div>
             <Label>Imóvel *</Label>
             <Select value={f.propertyId ?? ""} onValueChange={v => setF({ ...f, propertyId: v })}>
@@ -129,7 +146,14 @@ export function NewContractDialog({ open, onClose }: { open: boolean; onClose: (
               <Field label="Profissão"><Input value={f.profession ?? ""} onChange={e => setF({ ...f, profession: e.target.value })} /></Field>
               <Field label="Telefone"><Input value={f.phone ?? ""} onChange={e => setF({ ...f, phone: e.target.value })} /></Field>
               <Field label="Email" className="col-span-2"><Input value={f.email ?? ""} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
-              <Field label="Endereço atual do locatário (opcional)" className="col-span-2"><Input value={f.tenantAddress ?? ""} onChange={e => setF({ ...f, tenantAddress: e.target.value })} placeholder="Se vazio, usa endereço do imóvel" /></Field>
+              <Field label="Endereço do locatário (opcional)" className="col-span-2">
+                <Input
+                  value={f.tenantAddress ?? ""}
+                  onChange={e => setF({ ...f, tenantAddress: e.target.value })}
+                  placeholder={fullPropertyAddress ? `Se vazio: ${fullPropertyAddress}` : "Se vazio, usa endereço do imóvel"}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Por padrão, repete o mesmo endereço e numeração do imóvel locado.</p>
+              </Field>
             </div>
           </div>
 
