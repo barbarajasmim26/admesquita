@@ -44,6 +44,7 @@ function Page() {
   const [template, setTemplate] = useState(tpl.body);
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set((tenants as any[]).map((t: any) => t.id)));
+  const [groupLink, setGroupLink] = useState<string>(() => (typeof localStorage !== "undefined" ? localStorage.getItem("wa_group_link") ?? "" : ""));
 
   const list = useMemo(() => {
     const f = filter.trim().toLowerCase();
@@ -84,18 +85,14 @@ function Page() {
     }
   }
   function sendAll() {
-    const targets = (tenants as any[]).filter((t: any) => selected.has(t.id) && digits(t.phone));
-    if (targets.length === 0) { toast.error("Nenhum destinatário selecionado com telefone."); return; }
-    if (targets.length > 10 && !confirm(`Abrir ${targets.length} abas do WhatsApp?`)) return;
-    let opened = 0, blocked = 0;
-    for (const t of targets) {
-      const url = linkFor(t);
-      if (!url) continue;
-      const w = window.open(url, "_blank");
-      if (w) opened++; else blocked++;
-    }
-    if (blocked > 0) toast.warning(`${opened} abertas. ${blocked} bloqueadas — libere pop-ups.`);
-    else toast.success(`${opened} conversas abertas.`);
+    const link = groupLink.trim();
+    if (!link) { toast.error("Cole o link do grupo de anúncio do WhatsApp."); return; }
+    localStorage.setItem("wa_group_link", link);
+    const msg = template.replace(/\{NOME\}/g, "pessoal").replace(/\{MES\}/g, mes);
+    navigator.clipboard.writeText(msg).catch(() => {});
+    const w = window.open(link, "_blank");
+    if (!w) toast.warning("Pop-up bloqueado — libere pop-ups. A mensagem foi copiada.");
+    else toast.success("Grupo aberto e mensagem copiada — cole (Ctrl+V) e envie.");
   }
   function copyAll() {
     const targets = (tenants as any[]).filter((t: any) => selected.has(t.id));
@@ -151,6 +148,17 @@ function Page() {
                 {list.every((t: any) => selected.has(t.id)) ? "Desmarcar visíveis" : "Selecionar visíveis"}
               </button>
             </div>
+            <div>
+              <Label>Link do grupo de anúncio (WhatsApp)</Label>
+              <Input
+                placeholder="https://chat.whatsapp.com/XXXXXXXXXXXX"
+                value={groupLink}
+                onChange={e => setGroupLink(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                No WhatsApp: abra o grupo → Info do grupo → Convidar por link → Copiar link. Cole aqui uma vez.
+              </p>
+            </div>
             <Input placeholder="Filtrar por nome ou imóvel..." value={filter} onChange={e => setFilter(e.target.value)} />
             <div className="border rounded max-h-80 overflow-y-auto divide-y">
               {list.map((t: any) => {
@@ -174,15 +182,15 @@ function Page() {
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={sendAll} disabled={withPhone === 0}>
-                <Send className="size-4 mr-1" /> Enviar para todos ({withPhone})
+              <Button onClick={sendAll} disabled={!groupLink.trim()}>
+                <Send className="size-4 mr-1" /> Enviar no grupo de anúncio
               </Button>
               <Button variant="outline" onClick={copyAll} disabled={selectedCount === 0}>
                 <Copy className="size-4 mr-1" /> Copiar todas
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Cada destinatário abre em uma aba do WhatsApp Web com a mensagem pronta. Se o navegador bloquear, autorize pop-ups para este site.
+              "Enviar no grupo" abre o grupo de anúncio no WhatsApp Web e copia a mensagem para a área de transferência — basta colar (Ctrl+V) e enviar uma única vez para todos.
             </p>
           </CardContent>
         </Card>
