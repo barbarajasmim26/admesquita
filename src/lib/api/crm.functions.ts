@@ -851,8 +851,13 @@ export const listMonthPayments = async (data: { year: number; month: number }) =
   }
   await syncOverdue();
   const { data: rows, error } = await s.from("payments")
-    .select("id, amount, due_date, status, tenants(name, status, properties(name))")
+    .select("id, tenant_id, amount, due_date, status, tenants(name, status, properties(name))")
     .gte("due_date", start).lte("due_date", end).limit(2000);
   if (error) throw error;
-  return (rows ?? []).filter((p: any) => !p.tenants || p.tenants.status === "active");
+  const active = (rows ?? []).filter((p: any) => !p.tenants || p.tenants.status === "active");
+  // Se já existe cobrança PAGA do mesmo inquilino/valor no mês, esconde as duplicadas em aberto
+  const paidKeys = new Set(
+    active.filter((p: any) => p.status === "paid").map((p: any) => `${p.tenant_id}|${Number(p.amount)}`),
+  );
+  return active.filter((p: any) => p.status === "paid" || !paidKeys.has(`${p.tenant_id}|${Number(p.amount)}`));
 };
