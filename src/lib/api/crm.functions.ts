@@ -164,6 +164,21 @@ export const registerPayment = async (data: { paymentId: string; paidAmount: num
       notes: data.notes ?? null,
     }).eq("id", data.paymentId);
     if (error) throw error;
+    // Remove cobranças duplicadas em aberto do mesmo inquilino/valor no mesmo mês
+    const { data: cur } = await s.from("payments")
+      .select("id, tenant_id, amount, due_date").eq("id", data.paymentId).single();
+    if (cur) {
+      const d = new Date((cur as any).due_date + "T12:00:00");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      await s.from("payments").delete()
+        .eq("tenant_id", (cur as any).tenant_id)
+        .eq("amount", (cur as any).amount)
+        .neq("id", data.paymentId)
+        .neq("status", "paid")
+        .gte("due_date", `${d.getFullYear()}-${mm}-01`)
+        .lte("due_date", `${d.getFullYear()}-${mm}-${String(last).padStart(2, "0")}`);
+    }
     return { ok: true };
   };
 
