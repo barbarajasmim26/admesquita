@@ -31,7 +31,9 @@ function Page() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const { data } = useSuspenseQuery(opts(year, month));
+  const [showPaid, setShowPaid] = useState(false);
+  const { data: allData } = useSuspenseQuery(opts(year, month));
+  const data = showPaid ? allData : (allData ?? []).filter((p: any) => p.status !== "paid");
 
   const firstDay = new Date(year, month - 1, 1);
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -57,8 +59,11 @@ function Page() {
 
   return (
     <div>
-      <PageHeader title="Calendário" description={`Vencimentos de ${MESES[month - 1]}/${year}`} actions={
+      <PageHeader title="Calendário" description={`Cobranças em aberto de ${MESES[month - 1]}/${year}`} actions={
         <div className="flex items-center gap-2">
+          <Button variant={showPaid ? "default" : "outline"} size="sm" onClick={() => setShowPaid(v => !v)}>
+            {showPaid ? "Mostrando pagos" : "Só pendentes"}
+          </Button>
           <Button variant="outline" size="icon" onClick={prev}><ChevronLeft className="size-4" /></Button>
           <span className="font-medium text-sm w-32 text-center">{MESES[month - 1]} {year}</span>
           <Button variant="outline" size="icon" onClick={next}><ChevronRight className="size-4" /></Button>
