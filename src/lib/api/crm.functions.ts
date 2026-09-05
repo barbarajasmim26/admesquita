@@ -14,11 +14,32 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Recompute status for pending/overdue rows
+// Recompute status for pending/overdue rows.
+// Ciclo "postecipado" (mora e paga): atrasa no dia seguinte ao vencimento.
+// Ciclo "antecipado" (paga e mora): tem 1 mês de tolerância antes de virar atraso.
 async function syncOverdue() {
   const s = await admin();
-  await s.from("payments").update({ status: "overdue" }).eq("status", "pending").lt("due_date", today());
+  const t = today();
+  const g = new Date();
+  g.setMonth(g.getMonth() - 1);
+  const grace = g.toISOString().slice(0, 10);
+
+  const { data: cyc } = await s.from("tenants").select("id, payment_cycle").limit(5000);
+  const antecipado = new Set((cyc ?? []).filter((x: any) => x.payment_cycle === "antecipado").map((x: any) => x.id));
+
+  const { data: open } = await s.from("payments").select("id, tenant_id, due_date, status").neq("status", "paid").limit(5000);
+  const toOverdue: string[] = [];
+  const toPending: string[] = [];
+  for (const p of (open ?? []) as any[]) {
+    const cut = antecipado.has(p.tenant_id) ? grace : t;
+    const late = p.due_date < cut;
+    if (late && p.status !== "overdue") toOverdue.push(p.id);
+    if (!late && p.status === "overdue") toPending.push(p.id);
+  }
+  if (toOverdue.length) await s.from("payments").update({ status: "overdue" }).in("id", toOverdue);
+  if (toPending.length) await s.from("payments").update({ status: "pending" }).in("id", toPending);
 }
+
 
 // ---------- DASHBOARD ----------
 export const getDashboard = async () => {
