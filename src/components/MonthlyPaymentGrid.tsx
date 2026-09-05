@@ -86,8 +86,8 @@ export function MonthlyPaymentGrid({
   }
 
   const totalPaid = Object.values(byMonth).filter((p) => p.status === "paid").length;
-  const totalOverdue = Object.values(byMonth).filter((p) => p.status === "overdue" || (p.status !== "paid" && p.due_date < today)).length;
-  const totalPending = Object.values(byMonth).filter((p) => p.status === "pending" && p.due_date >= today).length;
+  const totalOverdue = Object.values(byMonth).filter((p) => p.status === "overdue").length;
+  const totalPending = Object.values(byMonth).filter((p) => p.status === "pending").length;
 
   return (
     <Card>
@@ -111,7 +111,7 @@ export function MonthlyPaymentGrid({
             const ym = `${year}-${String(monthNum).padStart(2, "0")}`;
             const beforeStart = startYM && ym < startYM;
             const p = byMonth[monthNum];
-            const isOverdue = p && p.status !== "paid" && p.due_date < today;
+            const isOverdue = p && p.status === "overdue";
             const state = !p
               ? "none"
               : p.status === "paid"
