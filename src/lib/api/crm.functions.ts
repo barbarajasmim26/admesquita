@@ -14,11 +14,32 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Recompute status for pending/overdue rows
+// Recompute status for pending/overdue rows.
+// Ciclo "postecipado" (mora e paga): atrasa no dia seguinte ao vencimento.
+// Ciclo "antecipado" (paga e mora): tem 1 mês de tolerância antes de virar atraso.
 async function syncOverdue() {
   const s = await admin();
-  await s.from("payments").update({ status: "overdue" }).eq("status", "pending").lt("due_date", today());
+  const t = today();
+  const g = new Date();
+  g.setMonth(g.getMonth() - 1);
+  const grace = g.toISOString().slice(0, 10);
+
+  const { data: cyc } = await s.from("tenants").select("id, payment_cycle").limit(5000);
+  const antecipado = new Set((cyc ?? []).filter((x: any) => x.payment_cycle === "antecipado").map((x: any) => x.id));
+
+  const { data: open } = await s.from("payments").select("id, tenant_id, due_date, status").neq("status", "paid").limit(5000);
+  const toOverdue: string[] = [];
+  const toPending: string[] = [];
+  for (const p of (open ?? []) as any[]) {
+    const cut = antecipado.has(p.tenant_id) ? grace : t;
+    const late = p.due_date < cut;
+    if (late && p.status !== "overdue") toOverdue.push(p.id);
+    if (!late && p.status === "overdue") toPending.push(p.id);
+  }
+  if (toOverdue.length) await s.from("payments").update({ status: "overdue" }).in("id", toOverdue);
+  if (toPending.length) await s.from("payments").update({ status: "pending" }).in("id", toPending);
 }
+
 
 // ---------- DASHBOARD ----------
 export const getDashboard = async () => {
@@ -43,7 +64,7 @@ export const getDashboard = async () => {
     .filter(p => ym(new Date(p.due_date + "T12:00:00")) === thisMonth)
     .reduce((a, p) => a + Number(p.amount ?? 0), 0);
   const inadimplencia = payments
-    .filter(p => p.status !== "paid" && p.due_date < today())
+    .filter(p => p.status === "overdue")
     .reduce((a, p) => a + Number(p.amount ?? 0), 0);
   const proximosVencimentos = payments
     .filter(p => p.status !== "paid" && p.due_date >= today())
@@ -53,7 +74,7 @@ export const getDashboard = async () => {
   const in30 = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
   const contractsEndingSoon = (contractsRes.data ?? []).filter((c: any) => c.end_date && c.end_date <= in30 && c.end_date >= today());
   const condominios = (propsRes.data ?? []).filter((p: any) => p.category === "condominio").length;
-  const overdueTenantIds = new Set(payments.filter((p: any) => p.status !== "paid" && p.due_date < today()).map((p: any) => p.tenant_id));
+  const overdueTenantIds = new Set(payments.filter((p: any) => p.status === "overdue").map((p: any) => p.tenant_id));
 
   const revenueByMonth: { month: string; total: number }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -76,7 +97,7 @@ export const getDashboard = async () => {
     receitaMes,
     previstoMes,
     inadimplencia,
-    overdueCount: payments.filter(p => p.status !== "paid" && p.due_date < today()).length,
+    overdueCount: payments.filter(p => p.status === "overdue").length,
     pendingCount: payments.filter(p => p.status !== "paid").length,
     proximosVencimentos,
     revenueByMonth,
@@ -260,7 +281,7 @@ export const listOverdueByTenant = async () => {
   const s = await admin();
   const { data, error } = await s.from("payments").select(
     "id, amount, due_date, status, tenant_id, tenants(id, name, phone, status, properties(name, address))"
-  ).neq("status", "paid").lt("due_date", today()).limit(3000);
+  ).eq("status", "overdue").limit(3000);
   if (error) throw error;
   const map = new Map<string, { tenant: any; total: number; count: number; oldest: string }>();
   (data ?? []).forEach((p: any) => {
@@ -363,22 +384,47 @@ export const deactivateTenant = async (data: { id: string; exitDate?: string; no
 
 export const reactivateTenant = async (data: { id: string }) => {
   const s = await admin();
-  // We re-activate the tenant row
-  await s.from("tenants").update({ status: "active" }).eq("id", data.id);
-  
-  // Re-activate or create a new contract
-  const { data: t } = await s.from("tenants").select("*").eq("id", data.id).single();
-  if (t) {
+
+  // O id pode ser de um registro de "former_tenants" ou de um inquilino inativo.
+  const { data: existing } = await s.from("tenants").select("*").eq("id", data.id).maybeSingle();
+  let tenant: any = existing;
+
+  if (!tenant) {
+    const { data: f } = await s.from("former_tenants").select("*").eq("id", data.id).maybeSingle();
+    if (!f) throw new Error("Registro não encontrado");
+
+    // Procura um inquilino inativo equivalente
+    const { data: match } = await s.from("tenants").select("*")
+      .eq("property_id", f.property_id).eq("name", f.name).order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+    if (match) {
+      tenant = match;
+    } else {
+      const { data: created, error } = await s.from("tenants").insert({
+        name: f.name, property_id: f.property_id, phone: f.phone, email: f.email, cpf: f.cpf,
+        house_number: f.house_number, rent_amount: f.rent_amount ?? 0, due_day: f.due_day ?? 10,
+        deposit: f.deposit ?? 0, start_date: f.start_date ?? today(), notes: f.notes, status: "active",
+      }).select("*").single();
+      if (error) throw error;
+      tenant = created;
+    }
+    await s.from("former_tenants").delete().eq("id", f.id);
+  } else {
+    await s.from("former_tenants").delete().eq("name", tenant.name).eq("property_id", tenant.property_id);
+  }
+
+  await s.from("tenants").update({ status: "active", exit_date: null }).eq("id", tenant.id);
+
+  const { data: activeCt } = await s.from("contracts").select("id")
+    .eq("tenant_id", tenant.id).eq("status", "active").limit(1).maybeSingle();
+  if (!activeCt) {
     await s.from("contracts").insert({
-      tenant_id: t.id, property_id: t.property_id,
-      rent_amount: t.rent_amount, due_day: t.due_day, start_date: today(), status: "active",
+      tenant_id: tenant.id, property_id: tenant.property_id,
+      rent_amount: tenant.rent_amount ?? 0, due_day: tenant.due_day ?? 10, start_date: today(), status: "active",
     });
   }
-  
-  // Delete from former_tenants if exists
-  await s.from("former_tenants").delete().eq("name", t.name).eq("property_id", t.property_id);
-  
-  return { ok: true };
+
+  return { ok: true, id: tenant.id };
 };
 
 // ---------- PROPERTIES ----------
