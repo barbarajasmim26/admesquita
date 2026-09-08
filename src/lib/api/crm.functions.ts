@@ -783,16 +783,38 @@ export const deleteTask = async (data: { id: string }) => {
 };
 
 // ---------- LEADS / CRM ----------
+const LEAD_STATUS_LABEL: Record<string, string> = {
+  novo: "Novo",
+  contato: "Em Contato",
+  visita: "Visita Agendada",
+  proposta: "Proposta",
+  fechado: "Fechado",
+  perdido: "Perdido",
+};
+
 export const listLeads = async () => {
   const s = await admin();
-  const { data, error } = await s.from("leads").select("*, properties(id,name)").order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  const [leadsRes, actsRes] = await Promise.all([
+    s.from("leads").select("*, properties(id,name)").order("created_at", { ascending: false }),
+    s.from("lead_activities").select("lead_id, activity_date").order("activity_date", { ascending: false }),
+  ]);
+  if (leadsRes.error) throw leadsRes.error;
+  if (actsRes.error) throw actsRes.error;
+  // Most recent activity per lead (first row wins since already ordered desc)
+  const lastContact: Record<string, string> = {};
+  for (const a of (actsRes.data ?? []) as any[]) {
+    if (!lastContact[a.lead_id]) lastContact[a.lead_id] = a.activity_date;
+  }
+  return ((leadsRes.data ?? []) as any[]).map((l) => ({
+    ...l,
+    last_contact_at: lastContact[l.id] ?? l.created_at,
+  }));
 };
 
 export const upsertLead = async (data: {
   id?: string; name: string; phone?: string; email?: string; source?: string;
   interest?: string; budget?: number; propertyId?: string; status?: string; notes?: string;
+  nextFollowup?: string;
 }) => {
   const s = await admin();
   const payload: any = {
@@ -805,6 +827,7 @@ export const upsertLead = async (data: {
     property_id: data.propertyId || null,
     status: data.status || "novo",
     notes: data.notes || null,
+    next_followup: data.nextFollowup || null,
   };
   if (data.id) {
     const { error } = await s.from("leads").update(payload).eq("id", data.id);
@@ -813,6 +836,7 @@ export const upsertLead = async (data: {
   }
   const { data: row, error } = await s.from("leads").insert(payload).select("id").single();
   if (error) throw error;
+  await s.from("lead_activities").insert({ lead_id: row.id, type: "criado", description: "Lead cadastrado no funil" });
   return { ok: true, id: row.id };
 };
 
@@ -820,12 +844,41 @@ export const updateLeadStatus = async (data: { id: string; status: string }) => 
   const s = await admin();
   const { error } = await s.from("leads").update({ status: data.status }).eq("id", data.id);
   if (error) throw error;
+  await s.from("lead_activities").insert({
+    lead_id: data.id,
+    type: "status",
+    description: `Movido para: ${LEAD_STATUS_LABEL[data.status] ?? data.status}`,
+  });
   return { ok: true };
 };
 
 export const deleteLead = async (data: { id: string }) => {
   const s = await admin();
   const { error } = await s.from("leads").delete().eq("id", data.id);
+  if (error) throw error;
+  return { ok: true };
+};
+
+// ---------- LEAD ACTIVITIES (timeline de follow-up) ----------
+export const listLeadActivities = async (data: { leadId: string }) => {
+  const s = await admin();
+  const { data: rows, error } = await s
+    .from("lead_activities")
+    .select("*")
+    .eq("lead_id", data.leadId)
+    .order("activity_date", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return rows ?? [];
+};
+
+export const addLeadActivity = async (data: { leadId: string; type: string; description?: string }) => {
+  const s = await admin();
+  const { error } = await s.from("lead_activities").insert({
+    lead_id: data.leadId,
+    type: data.type,
+    description: data.description || null,
+  });
   if (error) throw error;
   return { ok: true };
 };
