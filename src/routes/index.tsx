@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { getDashboard } from "@/lib/api/crm.functions";
 import { PageHeader } from "@/components/AppLayout";
+import { MonthPanel } from "@/components/MonthPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { brl, formatDateBR } from "@/lib/finance";
 import { Home, Users, Wallet, AlertTriangle, Building2, FileSignature, TrendingUp, UserMinus } from "lucide-react";
@@ -49,6 +50,7 @@ function DashboardPage() {
     <div>
       <PageHeader title="Dashboard" description="Visão geral da operação" />
       <div className="p-8 space-y-6">
+        <MonthPanel />
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <StatCard icon={Home} label="Imóveis" value={String(data.properties)} hint={`${data.condominios} condomínio(s)`} tone="primary" to="/imoveis" />
           <StatCard icon={Users} label="Inquilinos ativos" value={String(data.activeTenants)} hint={`${data.overdueTenants} inadimplentes`} tone="success" to="/inquilinos" />

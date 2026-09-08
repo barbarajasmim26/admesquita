@@ -524,14 +524,14 @@ export const endTenancy = async (data: { tenantId: string; endDate: string; note
 // ---------- EXPENSES ----------
 export const listExpenses = async (data: { month?: string; propertyId?: string } = {}) => {
   const s = await admin();
-  let q = s.from("expenses").select("*, properties(id, name)").order("date", { ascending: false });
+  let q = s.from("expenses").select("*, properties(id, name)").order("expense_date", { ascending: false });
   if (data.propertyId) q = q.eq("property_id", data.propertyId);
   if (data.month) {
     const [y, m] = data.month.split("-").map(Number);
     const start = `${y}-${String(m).padStart(2, "0")}-01`;
     const last = new Date(y, m, 0).getDate();
     const end = `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
-    q = q.gte("date", start).lte("date", end);
+    q = q.gte("expense_date", start).lte("expense_date", end);
   }
   const { data: rows } = await q;
   return rows ?? [];
@@ -539,7 +539,7 @@ export const listExpenses = async (data: { month?: string; propertyId?: string }
 
 export const upsertExpense = async (data: { id?: string; description: string; amount: number; date: string; category?: string; propertyId?: string }) => {
   const s = await admin();
-  const payload = { description: data.description, amount: data.amount, date: data.date, category: data.category || "outros", property_id: data.propertyId };
+  const payload = { description: data.description, amount: data.amount, expense_date: data.date, category: data.category || "outros", property_id: data.propertyId };
   if (data.id) {
     await s.from("expenses").update(payload).eq("id", data.id);
     return { ok: true, id: data.id };
@@ -578,7 +578,7 @@ export const getFinancialReport = async (data: { year: number }) => {
   const end = `${data.year}-12-31`;
   const [paymentsRes, expensesRes] = await Promise.all([
     s.from("payments").select("amount, paid_amount, paid_date, status").gte("paid_date", start).lte("paid_date", end).eq("status", "paid"),
-    s.from("expenses").select("amount, date").gte("date", start).lte("date", end),
+    s.from("expenses").select("amount, expense_date").gte("expense_date", start).lte("expense_date", end),
   ]);
   const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const revenue = new Array(12).fill(0);
@@ -588,7 +588,7 @@ export const getFinancialReport = async (data: { year: number }) => {
     revenue[m] += Number(p.paid_amount ?? p.amount ?? 0);
   });
   (expensesRes.data ?? []).forEach(e => {
-    const m = new Date(e.date).getMonth();
+    const m = new Date(e.expense_date).getMonth();
     expenses[m] += Number(e.amount ?? 0);
   });
   return months.map((name, i) => ({ name, revenue: revenue[i], expenses: expenses[i], profit: revenue[i] - expenses[i] }));
@@ -677,7 +677,7 @@ export const getReports = async () => {
   const end = `${year}-12-31`;
   const [paymentsRes, expensesRes, propsRes, tenantsRes] = await Promise.all([
     s.from("payments").select("amount, paid_amount, paid_date, status, due_date"),
-    s.from("expenses").select("amount, date").gte("date", start).lte("date", end),
+    s.from("expenses").select("amount, expense_date").gte("expense_date", start).lte("expense_date", end),
     s.from("properties").select("id, name"),
     s.from("tenants").select("id, property_id, status").eq("status", "active"),
   ]);
@@ -699,7 +699,7 @@ export const getReports = async () => {
   });
   let totalExpenses = 0;
   (expensesRes.data ?? []).forEach((e: any) => {
-    const m = new Date(e.date).getMonth();
+    const m = new Date(e.expense_date).getMonth();
     const v = Number(e.amount ?? 0);
     expByMonth[m] += v;
     totalExpenses += v;
@@ -974,4 +974,93 @@ export const listMonthPayments = async (data: { year: number; month: number }) =
     active.filter((p: any) => p.status === "paid").map((p: any) => `${p.tenant_id}|${Number(p.amount)}`),
   );
   return active.filter((p: any) => p.status === "paid" || !paidKeys.has(`${p.tenant_id}|${Number(p.amount)}`));
+};
+
+// ---------- PAINEL DO MÊS ----------
+export const getMonthPanel = async (data: { year: number; month: number }) => {
+  await syncOverdue();
+  const s = await admin();
+  const mm = String(data.month).padStart(2, "0");
+  const start = `${data.year}-${mm}-01`;
+  const lastDay = new Date(data.year, data.month, 0).getDate();
+  const end = `${data.year}-${mm}-${String(lastDay).padStart(2, "0")}`;
+
+  const [payRes, expRes] = await Promise.all([
+    s.from("payments").select(
+      "id, amount, paid_amount, due_date, paid_date, status, notes, tenant_id, tenants(id, name, phone, status, due_day, pix_payer, house_number, properties(id, name))"
+    ).gte("due_date", start).lte("due_date", end).limit(5000),
+    s.from("expenses").select("amount, description, expense_date").gte("expense_date", start).lte("expense_date", end),
+  ]);
+
+  const rows = ((payRes.data ?? []) as any[]).filter((p) => p.tenants && p.tenants.status === "active");
+  const num = (v: any) => Number(v ?? 0);
+  const previsto = rows.reduce((a, p) => a + num(p.amount), 0);
+  const recebido = rows.filter((p) => p.status === "paid").reduce((a, p) => a + num(p.paid_amount ?? p.amount), 0);
+  const overdue = rows.filter((p) => p.status === "overdue");
+  const pending = rows.filter((p) => p.status === "pending");
+
+  const t = today();
+  const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const dueThisWeek = pending.filter((p) => p.due_date >= t && p.due_date <= in7)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+  const despesas = (expRes.data ?? []).reduce((a: number, e: any) => a + num(e.amount), 0);
+
+  return {
+    year: data.year,
+    month: data.month,
+    previsto,
+    recebido,
+    falta: Math.max(0, previsto - recebido),
+    despesas,
+    lucro: recebido - despesas,
+    paidCount: rows.filter((p) => p.status === "paid").length,
+    totalCount: rows.length,
+    overdue: overdue.sort((a, b) => a.due_date.localeCompare(b.due_date)),
+    pending,
+    dueThisWeek,
+    expenses: expRes.data ?? [],
+  };
+};
+
+// ---------- CONTRATOS: FIM E REAJUSTE ----------
+export const getContractWatch = async (data: { percent?: number } = {}) => {
+  const s = await admin();
+  const percent = data.percent ?? 4.5;
+  const { data: rows } = await s.from("contracts")
+    .select("id, start_date, end_date, rent_amount, readjustment_index, status, tenants(id, name, phone, status), properties(id, name)")
+    .eq("status", "active").limit(2000);
+
+  const now = new Date();
+  const t = today();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const in30 = iso(new Date(now.getTime() + 30 * 86400000));
+  const in60 = iso(new Date(now.getTime() + 60 * 86400000));
+
+  const ending: any[] = [];
+  const readjust: any[] = [];
+
+  for (const c of ((rows ?? []) as any[])) {
+    if (!c.tenants || c.tenants.status !== "active") continue;
+    if (c.end_date && c.end_date >= t && c.end_date <= in60) {
+      ending.push({ ...c, daysLeft: Math.round((new Date(c.end_date + "T12:00:00").getTime() - now.getTime()) / 86400000), urgency: c.end_date <= in30 ? "alta" : "media" });
+    }
+    if (c.start_date) {
+      const st = new Date(c.start_date + "T12:00:00");
+      const monthsElapsed = (now.getFullYear() - st.getFullYear()) * 12 + (now.getMonth() - st.getMonth());
+      if (monthsElapsed >= 12 && monthsElapsed % 12 <= 1) {
+        const oldAmount = Number(c.rent_amount ?? 0);
+        readjust.push({
+          ...c,
+          years: Math.floor(monthsElapsed / 12),
+          oldAmount,
+          newAmount: Math.round(oldAmount * (1 + percent / 100) * 100) / 100,
+          percent,
+          indexName: c.readjustment_index ?? "IGPM",
+        });
+      }
+    }
+  }
+  ending.sort((a, b) => (a.end_date ?? "").localeCompare(b.end_date ?? ""));
+  return { percent, ending, readjust };
 };
