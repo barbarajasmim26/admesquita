@@ -524,14 +524,14 @@ export const endTenancy = async (data: { tenantId: string; endDate: string; note
 // ---------- EXPENSES ----------
 export const listExpenses = async (data: { month?: string; propertyId?: string } = {}) => {
   const s = await admin();
-  let q = s.from("expenses").select("*, properties(id, name)").order("date", { ascending: false });
+  let q = s.from("expenses").select("*, properties(id, name)").order("expense_date", { ascending: false });
   if (data.propertyId) q = q.eq("property_id", data.propertyId);
   if (data.month) {
     const [y, m] = data.month.split("-").map(Number);
     const start = `${y}-${String(m).padStart(2, "0")}-01`;
     const last = new Date(y, m, 0).getDate();
     const end = `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
-    q = q.gte("date", start).lte("date", end);
+    q = q.gte("expense_date", start).lte("expense_date", end);
   }
   const { data: rows } = await q;
   return rows ?? [];
@@ -539,7 +539,7 @@ export const listExpenses = async (data: { month?: string; propertyId?: string }
 
 export const upsertExpense = async (data: { id?: string; description: string; amount: number; date: string; category?: string; propertyId?: string }) => {
   const s = await admin();
-  const payload = { description: data.description, amount: data.amount, date: data.date, category: data.category || "outros", property_id: data.propertyId };
+  const payload = { description: data.description, amount: data.amount, expense_date: data.date, category: data.category || "outros", property_id: data.propertyId };
   if (data.id) {
     await s.from("expenses").update(payload).eq("id", data.id);
     return { ok: true, id: data.id };
@@ -578,7 +578,7 @@ export const getFinancialReport = async (data: { year: number }) => {
   const end = `${data.year}-12-31`;
   const [paymentsRes, expensesRes] = await Promise.all([
     s.from("payments").select("amount, paid_amount, paid_date, status").gte("paid_date", start).lte("paid_date", end).eq("status", "paid"),
-    s.from("expenses").select("amount, date").gte("date", start).lte("date", end),
+    s.from("expenses").select("amount, expense_date").gte("expense_date", start).lte("expense_date", end),
   ]);
   const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const revenue = new Array(12).fill(0);
@@ -588,7 +588,7 @@ export const getFinancialReport = async (data: { year: number }) => {
     revenue[m] += Number(p.paid_amount ?? p.amount ?? 0);
   });
   (expensesRes.data ?? []).forEach(e => {
-    const m = new Date(e.date).getMonth();
+    const m = new Date(e.expense_date).getMonth();
     expenses[m] += Number(e.amount ?? 0);
   });
   return months.map((name, i) => ({ name, revenue: revenue[i], expenses: expenses[i], profit: revenue[i] - expenses[i] }));
@@ -677,7 +677,7 @@ export const getReports = async () => {
   const end = `${year}-12-31`;
   const [paymentsRes, expensesRes, propsRes, tenantsRes] = await Promise.all([
     s.from("payments").select("amount, paid_amount, paid_date, status, due_date"),
-    s.from("expenses").select("amount, date").gte("date", start).lte("date", end),
+    s.from("expenses").select("amount, expense_date").gte("expense_date", start).lte("expense_date", end),
     s.from("properties").select("id, name"),
     s.from("tenants").select("id, property_id, status").eq("status", "active"),
   ]);
@@ -699,7 +699,7 @@ export const getReports = async () => {
   });
   let totalExpenses = 0;
   (expensesRes.data ?? []).forEach((e: any) => {
-    const m = new Date(e.date).getMonth();
+    const m = new Date(e.expense_date).getMonth();
     const v = Number(e.amount ?? 0);
     expByMonth[m] += v;
     totalExpenses += v;
