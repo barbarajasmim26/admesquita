@@ -96,7 +96,7 @@ function Page() {
   const activitiesOpts = editing
     ? queryOptions({ queryKey: ["lead-activities", editing.id], queryFn: () => listLeadActivities({ leadId: editing.id } as any) })
     : null;
-  const { data: activities } = useQuery({ ...(activitiesOpts as any), enabled: !!editing });
+  const { data: activities } = useQuery({ ...(activitiesOpts as any), enabled: !!editing }) as { data: any[] | undefined };
 
   function openNew() {
     setEditing(null);
