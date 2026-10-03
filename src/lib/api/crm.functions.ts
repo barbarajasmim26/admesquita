@@ -214,7 +214,7 @@ export const unmarkPayment = async (data: { paymentId: string }) => {
 
 // Manually set / create / clear the payment for a tenant in a specific month.
 // status: 'paid' | 'pending' | 'overdue' | 'none' (none = delete the row)
-export const setMonthStatus = async (data: { tenantId: string; year: number; month: number; status: "paid" | "pending" | "overdue" | "none" }) => {
+export const setMonthStatus = async (data: { tenantId: string; year: number; month: number; status: "paid" | "pending" | "overdue" | "none"; paidAmount?: number; paidDate?: string; notes?: string }) => {
     const s = await admin();
     const { data: t } = await s.from("tenants").select("id, rent_amount, due_day").eq("id", data.tenantId).single();
     if (!t) throw new Error("Inquilino não encontrado");
@@ -246,7 +246,9 @@ export const setMonthStatus = async (data: { tenantId: string; year: number; mon
 
     if (data.status === "paid") {
       const today = new Date().toISOString().slice(0, 10);
-      await s.from("payments").update({ status: "paid", paid_date: today, paid_amount: Number(t.rent_amount ?? 0) }).eq("id", paymentId);
+      const upd: any = { status: "paid", paid_date: data.paidDate || today, paid_amount: data.paidAmount ?? Number(t.rent_amount ?? 0) };
+      if (data.notes !== undefined) upd.notes = data.notes || null;
+      await s.from("payments").update(upd).eq("id", paymentId);
     } else {
       await s.from("payments").update({ status: data.status, paid_date: null, paid_amount: null, late_fee: 0, interest: 0 }).eq("id", paymentId);
     }
@@ -1063,4 +1065,64 @@ export const getContractWatch = async (data: { percent?: number } = {}) => {
   }
   ending.sort((a, b) => (a.end_date ?? "").localeCompare(b.end_date ?? ""));
   return { percent, ending, readjust };
+};
+
+
+// ---------- VISÃO DIÁRIA (v2) ----------
+export const getDailyOverview = async () => {
+  await syncOverdue();
+  const s = await admin();
+  const [tRes, pRes, cRes] = await Promise.all([
+    s.from("tenants").select("id, name, phone, rent_amount, due_day, house_number, payment_cycle, pix_payer, properties(id, name)").eq("status", "active").order("name").limit(2000),
+    s.from("payments").select("id, tenant_id, amount, paid_amount, due_date, paid_date, status").limit(10000),
+    s.from("contracts").select("id, tenant_id, end_date, start_date, rent_amount, renewal_status, new_rent_amount, readjustment_index").eq("status", "active").limit(2000),
+  ]);
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1).toISOString().slice(0, 10);
+  const t = today();
+  const byTenant = new Map<string, any[]>();
+  for (const p of (pRes.data ?? []) as any[]) {
+    if (!byTenant.has(p.tenant_id)) byTenant.set(p.tenant_id, []);
+    byTenant.get(p.tenant_id)!.push(p);
+  }
+  const contractBy = new Map<string, any>();
+  for (const c of (cRes.data ?? []) as any[]) contractBy.set(c.tenant_id, c);
+
+  return ((tRes.data ?? []) as any[]).map((tn) => {
+    const pays = byTenant.get(tn.id) ?? [];
+    const cur = pays.find((p) => p.due_date.slice(0, 7) === ym);
+    const recent = pays.filter((p) => p.due_date >= yearAgo && p.due_date <= t);
+    const paidOnTime = recent.filter((p) => p.status === "paid" && p.paid_date && p.paid_date <= p.due_date).length;
+    const paidLate = recent.filter((p) => p.status === "paid" && p.paid_date && p.paid_date > p.due_date).length;
+    const overdue = pays.filter((p) => p.status === "overdue");
+    const overdueTotal = overdue.reduce((a, p) => a + Number(p.amount ?? 0), 0);
+    const c = contractBy.get(tn.id) ?? null;
+    const daysToEnd = c?.end_date ? Math.round((new Date(c.end_date + "T12:00:00").getTime() - now.getTime()) / 86400000) : null;
+    let currentStatus = "sem_cobranca";
+    if (cur) currentStatus = cur.status;
+    const late = overdue.length > 0;
+    const behavior = late ? "atrasado" : paidLate > paidOnTime ? "costuma_atrasar" : "em_dia";
+    return {
+      ...tn,
+      current: cur ?? null,
+      currentStatus,
+      overdueCount: overdue.length,
+      overdueTotal,
+      paidOnTime, paidLate,
+      behavior,
+      contract: c,
+      daysToEnd,
+    };
+  });
+};
+
+export const setRenewal = async (data: { contractId: string; renewalStatus: string; newRentAmount?: number | null }) => {
+  const s = await admin();
+  const { error } = await s.from("contracts").update({
+    renewal_status: data.renewalStatus,
+    new_rent_amount: data.newRentAmount ?? null,
+  }).eq("id", data.contractId);
+  if (error) throw error;
+  return { ok: true };
 };

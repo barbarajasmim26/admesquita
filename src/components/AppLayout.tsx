@@ -1,10 +1,11 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, AlertTriangle, FileText, Users, Home, FileSignature, UserMinus, Bell, Calendar, UserPlus, ClipboardList, BarChart3, MessageCircle, Bot, Megaphone } from "lucide-react";
+import { LayoutDashboard, Sun, Wallet, AlertTriangle, FileText, Users, Home, FileSignature, UserMinus, Bell, Calendar, UserPlus, ClipboardList, BarChart3, MessageCircle, Bot, Megaphone } from "lucide-react";
 import logo from "@/assets/mesquita-logo.png";
 import { cn } from "@/lib/utils";
 import { BotBell } from "@/components/BotBell";
 
 const NAV = [
+  { to: "/hoje", label: "Hoje", icon: Sun },
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/crm", label: "CRM / Leads", icon: UserPlus },
   { to: "/assistente", label: "Assistente", icon: Bot },

@@ -8,6 +8,8 @@ import { brl } from "@/lib/finance";
 import { ChevronLeft, ChevronRight, Check, Clock, AlertTriangle, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { downloadReceipt } from "@/lib/receipt-pdf";
+import { PayMonthDialog } from "@/components/PayMonthDialog";
+import { Pencil } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
@@ -51,11 +53,12 @@ export function MonthlyPaymentGrid({
     return map;
   }, [payments, year]);
 
+  const [payFor, setPayFor] = useState<{ month: number; p?: PaymentRow } | null>(null);
   const startYM = startDate ? startDate.slice(0, 7) : null;
 
-  async function update(month: number, status: "paid" | "pending" | "overdue" | "none") {
+  async function update(month: number, status: "paid" | "pending" | "overdue" | "none", extra: any = {}) {
     try {
-      await setStatus({ data: { tenantId, year, month, status } });
+      await setStatus({ data: { tenantId, year, month, status, ...extra } });
       toast.success("Atualizado");
       qc.invalidateQueries();
     } catch (e: any) {
@@ -159,8 +162,10 @@ export function MonthlyPaymentGrid({
                       </DropdownMenuItem>
                     </>
                   )}
-                  <DropdownMenuItem onClick={() => update(monthNum, "paid")}>
-                    <Check className="size-4 mr-2 text-emerald-500" /> Marcar como pago
+                  <DropdownMenuItem onClick={() => setPayFor({ month: monthNum, p })}>
+                    {p?.status === "paid"
+                      ? <><Pencil className="size-4 mr-2 text-emerald-500" /> Editar valor pago</>
+                      : <><Check className="size-4 mr-2 text-emerald-500" /> Marcar como pago</>}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => update(monthNum, "pending")}>
                     <Clock className="size-4 mr-2 text-amber-500" /> Marcar como pendente
@@ -179,8 +184,19 @@ export function MonthlyPaymentGrid({
           })}
         </div>
         <p className="text-xs text-muted-foreground">
-          Clique em um mês para alterar manualmente. Aluguel base: {brl(rentAmount)}.
+          Clique em um mês para alterar manualmente. Ao marcar como pago você pode mudar o valor (manutenção, multa, desconto). Aluguel base: {brl(rentAmount)}.
         </p>
+        {payFor && (
+          <PayMonthDialog
+            open={!!payFor}
+            onClose={() => setPayFor(null)}
+            month={payFor.month}
+            year={year}
+            baseAmount={Number(payFor.p?.amount ?? rentAmount)}
+            initial={payFor.p?.status === "paid" ? { paidAmount: Number(payFor.p.paid_amount ?? payFor.p.amount), paidDate: payFor.p.paid_date, notes: (payFor.p as any).notes } : undefined}
+            onConfirm={(v) => update(payFor.month, "paid", v)}
+          />
+        )}
       </CardContent>
     </Card>
   );

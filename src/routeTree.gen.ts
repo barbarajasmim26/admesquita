@@ -15,6 +15,7 @@ import { Route as RecibosRouteImport } from './routes/recibos'
 import { Route as InquilinosRouteImport } from './routes/inquilinos'
 import { Route as InadimplenciaRouteImport } from './routes/inadimplencia'
 import { Route as ImoveisRouteImport } from './routes/imoveis'
+import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as ExInquilinosRouteImport } from './routes/ex-inquilinos'
 import { Route as CrmRouteImport } from './routes/crm'
@@ -60,6 +61,11 @@ const InadimplenciaRoute = InadimplenciaRouteImport.update({
 const ImoveisRoute = ImoveisRouteImport.update({
   id: '/imoveis',
   path: '/imoveis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HojeRoute = HojeRouteImport.update({
+  id: '/hoje',
+  path: '/hoje',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/crm': typeof CrmRoute
   '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
+  '/hoje': typeof HojeRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
   '/inquilinos': typeof InquilinosRouteWithChildren
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/contratos': typeof ContratosRoute
   '/crm': typeof CrmRoute
   '/financeiro': typeof FinanceiroRoute
+  '/hoje': typeof HojeRoute
   '/inadimplencia': typeof InadimplenciaRoute
   '/recibos': typeof RecibosRoute
   '/relatorios': typeof RelatoriosRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/crm': typeof CrmRoute
   '/ex-inquilinos': typeof ExInquilinosRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
+  '/hoje': typeof HojeRoute
   '/imoveis': typeof ImoveisRouteWithChildren
   '/inadimplencia': typeof InadimplenciaRoute
   '/inquilinos': typeof InquilinosRouteWithChildren
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/ex-inquilinos'
     | '/financeiro'
+    | '/hoje'
     | '/imoveis'
     | '/inadimplencia'
     | '/inquilinos'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/contratos'
     | '/crm'
     | '/financeiro'
+    | '/hoje'
     | '/inadimplencia'
     | '/recibos'
     | '/relatorios'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/crm'
     | '/ex-inquilinos'
     | '/financeiro'
+    | '/hoje'
     | '/imoveis'
     | '/inadimplencia'
     | '/inquilinos'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   CrmRoute: typeof CrmRoute
   ExInquilinosRoute: typeof ExInquilinosRouteWithChildren
   FinanceiroRoute: typeof FinanceiroRoute
+  HojeRoute: typeof HojeRoute
   ImoveisRoute: typeof ImoveisRouteWithChildren
   InadimplenciaRoute: typeof InadimplenciaRoute
   InquilinosRoute: typeof InquilinosRouteWithChildren
@@ -346,6 +359,13 @@ declare module '@tanstack/react-router' {
       path: '/imoveis'
       fullPath: '/imoveis'
       preLoaderRoute: typeof ImoveisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hoje': {
+      id: '/hoje'
+      path: '/hoje'
+      fullPath: '/hoje'
+      preLoaderRoute: typeof HojeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/financeiro': {
@@ -515,6 +535,7 @@ const rootRouteChildren: RootRouteChildren = {
   CrmRoute: CrmRoute,
   ExInquilinosRoute: ExInquilinosRouteWithChildren,
   FinanceiroRoute: FinanceiroRoute,
+  HojeRoute: HojeRoute,
   ImoveisRoute: ImoveisRouteWithChildren,
   InadimplenciaRoute: InadimplenciaRoute,
   InquilinosRoute: InquilinosRouteWithChildren,
