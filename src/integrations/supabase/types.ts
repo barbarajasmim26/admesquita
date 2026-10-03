@@ -129,9 +129,11 @@ export type Database = {
           guarantor_name: string | null
           guarantor_phone: string | null
           id: string
+          new_rent_amount: number | null
           owner_id: string | null
           property_id: string
           readjustment_index: string | null
+          renewal_status: string
           rent_amount: number
           start_date: string
           status: string
@@ -149,9 +151,11 @@ export type Database = {
           guarantor_name?: string | null
           guarantor_phone?: string | null
           id?: string
+          new_rent_amount?: number | null
           owner_id?: string | null
           property_id: string
           readjustment_index?: string | null
+          renewal_status?: string
           rent_amount: number
           start_date: string
           status?: string
@@ -169,9 +173,11 @@ export type Database = {
           guarantor_name?: string | null
           guarantor_phone?: string | null
           id?: string
+          new_rent_amount?: number | null
           owner_id?: string | null
           property_id?: string
           readjustment_index?: string | null
+          renewal_status?: string
           rent_amount?: number
           start_date?: string
           status?: string
