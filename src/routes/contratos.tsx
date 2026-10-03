@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { brl, formatDateBR } from "@/lib/finance";
 import { downloadContract } from "@/lib/contract-pdf";
 import { NewContractDialog } from "@/components/NewContractDialog";
+import { ContractWatch } from "@/components/ContractWatch";
 import { FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
 
