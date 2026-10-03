@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { brl, formatDateBR } from "@/lib/finance";
 import { downloadContract } from "@/lib/contract-pdf";
 import { NewContractDialog } from "@/components/NewContractDialog";
+import { ContractWatch } from "@/components/ContractWatch";
 import { FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -92,6 +93,7 @@ function Page() {
         }
       />
       <div className="p-8 space-y-4">
+        <ContractWatch />
         <Input placeholder="Buscar inquilino ou imóvel..." value={q} onChange={e => setQ(e.target.value)} className="max-w-md" />
         <Accordion type="multiple" defaultValue={groups.map(([k]) => k)} className="space-y-2">
           {groups.map(([letter, items]) => (
