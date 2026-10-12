@@ -65,6 +65,33 @@ function Page() {
       }))
     : null;
 
+  async function receipt(p: any, withFossa: boolean) {
+    try {
+      const m = /fossa R\$\s?([\d.]+,\d{2})/.exec(p.notes ?? "");
+      const fromNotes = m ? Number(m[1].replace(/\./g, "").replace(",", ".")) : 0;
+      let fossaFee = fromNotes;
+      if (withFossa && !fossaFee) {
+        const v = prompt("Valor da taxa da fossa (R$):", "50");
+        if (v === null) return;
+        fossaFee = Number(v.replace(",", ".")) || 0;
+      }
+      const due = new Date(p.due_date + "T12:00:00");
+      await downloadReceipt({
+        tenantName: t?.name ?? "",
+        tenantCpf: t?.cpf ?? null,
+        amount: Number(p.paid_amount ?? p.amount ?? 0) - fromNotes,
+        propertyName: t?.properties?.name ?? "",
+        propertyAddress: t?.properties?.address ?? null,
+        houseNumber: t?.house_number ?? null,
+        referenceMonth: due.getMonth() + 1,
+        referenceYear: due.getFullYear(),
+        issueDate: p.paid_date ? new Date(p.paid_date + "T12:00:00") : new Date(),
+        pixPayer: t?.pix_payer ?? null,
+        fossaFee,
+      }, `recibo_${fossaFee ? "fossa_" : ""}${(t?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
+    } catch (e: any) { toast.error(e.message ?? "Erro ao baixar recibo"); }
+  }
+
   return (
     <div>
       <PageHeader title={t.name} description={`${t.properties?.name ?? ""} ${t.house_number ? `· casa ${t.house_number}` : ""}`}
@@ -176,22 +203,10 @@ function Page() {
                   <TableCell className="text-right whitespace-nowrap space-x-2">
                     {p.status !== "paid"
                       ? <Button size="sm" onClick={() => setPayOpen({ ...p, tenants: { ...t, properties: t.properties } })}><CheckCircle2 className="size-4 mr-1" />Pagar</Button>
-                      : <Button size="sm" variant="outline" onClick={async () => {
-                          try {
-                            const due = new Date(p.due_date + "T12:00:00");
-                            await downloadReceipt({
-                              tenantName: t?.name ?? "",
-                              tenantCpf: t?.cpf ?? null,
-                              amount: Number(p.paid_amount ?? p.amount ?? 0),
-                              propertyName: t?.properties?.name ?? "",
-                              propertyAddress: t?.properties?.address ?? null,
-                              houseNumber: t?.house_number ?? null,
-                              referenceMonth: due.getMonth() + 1,
-                              referenceYear: due.getFullYear(),
-                              issueDate: p.paid_date ? new Date(p.paid_date + "T12:00:00") : new Date(),
-                            }, `recibo_${(t?.name ?? "").replace(/\s+/g, "_")}_${due.getMonth() + 1}_${due.getFullYear()}.pdf`);
-                          } catch (e: any) { toast.error(e.message ?? "Erro ao baixar recibo"); }
-                        }}><FileDown className="size-4 mr-1" />Recibo</Button>}
+                      : <>
+                          <Button size="sm" variant="outline" onClick={() => receipt(p, false)}><FileDown className="size-4 mr-1" />Recibo</Button>
+                          <Button size="sm" variant="outline" className="border-amber-500/50 text-amber-700" onClick={() => receipt(p, true)}><FileDown className="size-4 mr-1" />Recibo + fossa</Button>
+                        </>}
                   </TableCell>
                 </TableRow>
               ))}
