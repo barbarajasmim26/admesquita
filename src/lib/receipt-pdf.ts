@@ -15,6 +15,7 @@ export interface ReceiptData {
   issueDate?: Date;
   pixPayer?: string | null;
   kind?: "aluguel" | "caucao";
+  fossaFee?: number;
 }
 
 const FIXED = {
@@ -53,8 +54,10 @@ export async function generateReceiptPDF(d: ReceiptData): Promise<Blob> {
   doc.setFontSize(13);
 
   const cpfTxt = d.tenantCpf ? `, CPF n° ${d.tenantCpf}` : "";
-  const valor = brl(d.amount);
-  const extenso = brlExtenso(d.amount);
+  const fossa = Number(d.fossaFee ?? 0);
+  const total = Number(d.amount) + fossa;
+  const valor = brl(total);
+  const extenso = brlExtenso(total);
   const mes = monthName(d.referenceMonth);
   const houseSuffix = d.houseNumber ? `, casa ${d.houseNumber}` : "";
   const address = d.propertyAddress
@@ -76,7 +79,7 @@ export async function generateReceiptPDF(d: ReceiptData): Promise<Blob> {
   // Build a token stream of { text, bold }
   const refPhrase = d.kind === "caucao"
     ? `, valor este referente à caução (depósito de garantia) do imóvel localizado na ${address}`
-    : `, valor este referente ao aluguel do mês de ${mes}, do imóvel localizado na ${address}`;
+    : `, valor este referente ao aluguel do mês de ${mes}${fossa > 0 ? ` (${brl(d.amount)}) e à taxa de manutenção da fossa (${brl(fossa)})` : ""}, do imóvel localizado na ${address}`;
   const tokens: { text: string; bold: boolean }[] = [
     { text: "Recebi de ", bold: false },
     { text: d.tenantName.toUpperCase(), bold: true },
