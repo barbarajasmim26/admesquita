@@ -949,6 +949,10 @@ export const listMonthPayments = async (data: { year: number; month: number }) =
     const { data: existing } = await s.from("payments")
       .select("tenant_id").gte("due_date", start).lte("due_date", end).limit(5000);
     const has = new Set((existing ?? []).map((r: any) => r.tenant_id));
+    // Quem pagou dentro deste mês (ex.: pagou o mês anterior agora) não recebe cobrança automática nova
+    const { data: paidHere } = await s.from("payments")
+      .select("tenant_id").eq("status", "paid").gte("paid_date", start).lte("paid_date", end).limit(5000);
+    (paidHere ?? []).forEach((r: any) => has.add(r.tenant_id));
     const toInsert: any[] = [];
     for (const t of activeTenants as any[]) {
       if (has.has(t.id)) continue;
