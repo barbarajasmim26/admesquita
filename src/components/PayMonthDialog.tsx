@@ -43,7 +43,7 @@ export function PayMonthDialog({
   async function save() {
     setSaving(true);
     const parts: string[] = [];
-    if (maint) parts.push(`manutenção ${brl(maint)}`);
+    if (maint) parts.push(`fossa ${brl(maint)}`);
     if (fee) parts.push(`multa/atraso ${brl(fee)}`);
     if (other) parts.push(`outros ${brl(other)}`);
     if (discount) parts.push(`desconto ${brl(discount)}`);
@@ -64,7 +64,9 @@ export function PayMonthDialog({
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Aluguel</Label><Input type="number" step="0.01" value={rent} onChange={e => setRent(num(e.target.value))} /></div>
             <div><Label>Data do pagamento</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-            <div><Label>+ Manutenção</Label><Input type="number" step="0.01" value={maint || ""} placeholder="0" onChange={e => setMaint(num(e.target.value))} /></div>
+            <div><Label className="flex items-center justify-between">+ Taxa da fossa
+              <button type="button" className="text-xs text-primary hover:underline" onClick={() => setMaint(maint ? 0 : 50)}>{maint ? "tirar" : "+ R$ 50"}</button></Label>
+              <Input type="number" step="0.01" value={maint || ""} placeholder="0" onChange={e => setMaint(num(e.target.value))} /></div>
             <div><Label>+ Multa / atraso</Label><Input type="number" step="0.01" value={fee || ""} placeholder="0" onChange={e => setFee(num(e.target.value))} /></div>
             <div><Label>+ Outros</Label><Input type="number" step="0.01" value={other || ""} placeholder="0" onChange={e => setOther(num(e.target.value))} /></div>
             <div><Label>− Desconto</Label><Input type="number" step="0.01" value={discount || ""} placeholder="0" onChange={e => setDiscount(num(e.target.value))} /></div>
