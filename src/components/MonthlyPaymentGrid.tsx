@@ -70,6 +70,7 @@ export function MonthlyPaymentGrid({
     // taxa da fossa registrada no pagamento entra automática no recibo
     const m = /fossa R\$\s?([\d.]+,\d{2})/.exec((payment as any).notes ?? "");
     let fossaFee = m ? Number(m[1].replace(/\./g, "").replace(",", ".")) : 0;
+    const fromNotes = fossaFee;
     if (withFossa && !fossaFee) {
       const v = prompt("Valor da taxa da fossa (R$):", "50");
       if (v === null) return;
@@ -82,7 +83,7 @@ export function MonthlyPaymentGrid({
       await downloadReceipt({
         tenantName: tenant?.name ?? "",
         tenantCpf: tenant?.cpf ?? null,
-        amount: Number(payment.paid_amount ?? payment.amount ?? 0) - fossaFee,
+        amount: Number(payment.paid_amount ?? payment.amount ?? 0) - fromNotes,
         propertyName: property?.name ?? "",
         propertyAddress: property?.address ?? null,
         houseNumber: tenant?.house_number ?? null,
